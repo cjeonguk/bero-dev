@@ -11,6 +11,8 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider,
+  SidebarRail,
+  SidebarSeparator,
   SidebarTrigger,
 } from "~/components/ui/sidebar";
 
@@ -18,13 +20,24 @@ export default function TeacherSidebar() {
   return (
     <SidebarProvider>
       <Sidebar collapsible="icon">
-        <SidebarHeader />
-        <SidebarTrigger />
+        <SidebarHeader>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton>
+                <SidebarTrigger />
+                <span>Dashboard</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarHeader>
+        <SidebarSeparator />
         <SidebarContent>
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton asChild>
-                <a href="/teacher/dashboard">Dashboard</a>
+                <a href="/teacher/dashboard">
+                  <span>Dashboard</span>
+                </a>
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
