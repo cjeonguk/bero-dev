@@ -14,26 +14,24 @@ export default [
       route("dashboard", "routes/admin/dashboard.tsx"),
       route("register", "routes/admin/register.tsx"),
     ]),
-    layout("layouts/teacher-sidebar.tsx", [
-      ...prefix("teacher", [
-        route("dashboard", "routes/teacher/dashboard.tsx"),
-        route("register-class", "routes/teacher/register-class.tsx"),
-        ...prefix("school-admin", [
-          route("dashboard", "routes/teacher/school-admin/dashboard.tsx"),
-          route("register", "routes/teacher/school-admin/register/index.tsx", [
-            route(
-              "teacher",
-              "routes/teacher/school-admin/register/register-teacher.tsx"
-            ),
-            route(
-              "student",
-              "routes/teacher/school-admin/register/register-student.tsx"
-            ),
-            route(
-              "room",
-              "routes/teacher/school-admin/register/register-room.tsx"
-            ),
-          ]),
+    ...prefix("teacher", [
+      route("dashboard", "routes/teacher/dashboard.tsx"),
+      route("register-class", "routes/teacher/register-class.tsx"),
+      ...prefix("school-admin", [
+        route("dashboard", "routes/teacher/school-admin/dashboard.tsx"),
+        route("register", "routes/teacher/school-admin/register/index.tsx", [
+          route(
+            "teacher",
+            "routes/teacher/school-admin/register/register-teacher.tsx"
+          ),
+          route(
+            "student",
+            "routes/teacher/school-admin/register/register-student.tsx"
+          ),
+          route(
+            "room",
+            "routes/teacher/school-admin/register/register-room.tsx"
+          ),
         ]),
       ]),
     ]),
