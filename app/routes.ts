@@ -9,6 +9,7 @@ import {
 export default [
   layout("layouts/main.tsx", [
     index("routes/home.tsx"),
+    route("api", "routes/api.tsx"),
     route("login", "routes/login.tsx"),
     ...prefix("admin", [
       route("dashboard", "routes/admin/dashboard.tsx"),
