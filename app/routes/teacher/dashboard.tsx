@@ -44,9 +44,7 @@ export default function TeacherSidebar() {
         </SidebarContent>
         <SidebarFooter />
       </Sidebar>
-      <main>
-        <div>teacher dashboard</div>
-      </main>
+      <div>teacher dashboard</div>
     </SidebarProvider>
   );
 }

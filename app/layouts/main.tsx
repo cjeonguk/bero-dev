@@ -1,5 +1,12 @@
 import { Outlet } from "react-router";
 
 export default function Main() {
-  return <Outlet />;
+  return (
+    <>
+      <header>Bero</header>
+      <main>
+        <Outlet />
+      </main>
+    </>
+  );
 }
