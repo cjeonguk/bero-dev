@@ -10,11 +10,22 @@ export default [
   layout("layouts/main.tsx", [
     index("routes/home.tsx"),
     route("api", "routes/api.tsx"),
+
     route("login", "routes/login.tsx"),
+    route("logout", "routes/logout.tsx"),
+    route("sign-up", "routes/sign-up.tsx"),
+    route("forgot-password", "routes/forgot-password.tsx"),
+    route("update-password", "routes/update-password.tsx"),
+    ...prefix("auth", [
+      route("confirm", "routes/auth/confirm.tsx"),
+      route("error", "routes/auth/error.tsx"),
+    ]),
+
     ...prefix("admin", [
       route("dashboard", "routes/admin/dashboard.tsx"),
       route("register", "routes/admin/register.tsx"),
     ]),
+
     ...prefix("teacher", [
       route("dashboard", "routes/teacher/dashboard.tsx"),
       route("register-class", "routes/teacher/register-class.tsx"),
@@ -36,6 +47,7 @@ export default [
         ]),
       ]),
     ]),
+
     route("student", "routes/student/index.tsx", [
       route("report", "routes/student/report.tsx", [
         route(":hash", "routes/student/confirm-report.tsx"),
