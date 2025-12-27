@@ -10,11 +10,13 @@
     "prepare": "husky"
   },
   "dependencies": {
+    "@netlify/vite-plugin-react-router": "^2.1.2",
     "@radix-ui/react-dialog": "^1.1.15",
+    "@radix-ui/react-label": "^2.1.8",
     "@radix-ui/react-separator": "^1.1.8",
     "@radix-ui/react-slot": "^1.2.4",
     "@radix-ui/react-tooltip": "^1.2.8",
-    "@netlify/vite-plugin-react-router": "^2.1.2",
+    "@react-router/fs-routes": "^7.11.0",
     "@react-router/node": "^7.11.0",
     "@react-router/serve": "^7.11.0",
     "@supabase/ssr": "^0.8.0",
