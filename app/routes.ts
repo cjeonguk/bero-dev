@@ -9,6 +9,7 @@ import {
 export default [
   layout("layouts/main.tsx", [
     index("routes/home.tsx"),
+    route("api", "routes/api.tsx"),
     route("login", "routes/login.tsx"),
     ...prefix("admin", [
       route("dashboard", "routes/admin/dashboard.tsx"),
@@ -22,15 +23,15 @@ export default [
         route("register", "routes/teacher/school-admin/register/index.tsx", [
           route(
             "teacher",
-            "routes/teacher/school-admin/register/register-teacher.tsx"
+            "routes/teacher/school-admin/register/register-teacher.tsx",
           ),
           route(
             "student",
-            "routes/teacher/school-admin/register/register-student.tsx"
+            "routes/teacher/school-admin/register/register-student.tsx",
           ),
           route(
             "room",
-            "routes/teacher/school-admin/register/register-room.tsx"
+            "routes/teacher/school-admin/register/register-room.tsx",
           ),
         ]),
       ]),
