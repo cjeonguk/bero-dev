@@ -1,4 +1,18 @@
 import { useRef, useState } from "react";
+import type { Route } from "./+types/dashboard";
+import { createClient } from "~/lib/supabase/server";
+import { redirect } from "react-router";
+
+export async function loader({ request }: Route.LoaderArgs) {
+  const { supabase } = createClient(request);
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return redirect("/login");
+  }
+  return { user };
+}
 
 export default function TeacherSidebar() {
   const [className, setClassName] = useState("연애학개론 (M)");
@@ -28,10 +42,7 @@ export default function TeacherSidebar() {
     { id: 241115, name: "최정욱", attendance: true },
     { id: 241116, name: "최정욱", attendance: true },
   ];
-  function getColumnCount(arr: any[]) {
-    if (arr.length <= 16) return 4;
-    return Math.ceil(Math.sqrt(arr.length));
-  }
+
   function handleClassNameEdit() {
     const div = classNameDivRef.current!;
     setClassNameEditable(true);
@@ -54,6 +65,7 @@ export default function TeacherSidebar() {
     setClassNameEditable(false);
     div.innerText = className;
   }
+
   return (
     <div className="flex w-full h-[calc(100vh-6rem)]">
       <div className="flex flex-col self-center justify-center h-full bg-[#D9D9D9]">
@@ -109,7 +121,7 @@ export default function TeacherSidebar() {
         <div
           className={`w-full max-w-6xl grid gap-2 ${students.length > 12 ? "content-stretch" : "grid-rows-4"} h-[480px]`}
           style={{
-            gridTemplateColumns: `repeat(${getColumnCount(students)}, minmax(0, 1fr))`,
+            gridTemplateColumns: `repeat(${getColumnCount(students.length)}, minmax(0, 1fr))`,
           }}
         >
           {students.map((student) => (
@@ -125,4 +137,9 @@ export default function TeacherSidebar() {
       </div>
     </div>
   );
+}
+
+function getColumnCount(arrayLength: number) {
+  if (arrayLength <= 16) return 4;
+  return Math.ceil(Math.sqrt(arrayLength));
 }
