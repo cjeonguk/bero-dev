@@ -26,9 +26,20 @@ export async function action({ request }: Route.ActionArgs) {
     if (!studentName || !studentName.name)
       return { success: false, studentName: "" };
 
+    const { data: classroomName, error: classroomError } = await supabase
+      .from("students")
+      .select("id")
+      .eq("name", body.classroom)
+      .single();
+
+    if (classroomError) throw classroomError;
+
+    if (!classroomName || !classroomName.id)
+      return { success: false, studentName: studentName.name };
+
     const { error: updateError } = await supabase
       .from("students")
-      .update({ last_detected_place: body.classroom })
+      .update({ last_detected_place: classroomName.id })
       .match({ name: studentName.name });
 
     if (updateError) throw updateError;
