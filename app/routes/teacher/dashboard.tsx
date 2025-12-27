@@ -1,6 +1,8 @@
 import { useRef, useState } from "react";
+import type { Route } from "./+types/dashboard";
+import { createClient } from "~/lib/supabase/server";
+import { redirect } from "react-router";
 
-/*
 export async function loader({ request }: Route.LoaderArgs) {
   const { supabase } = createClient(request);
   const {
@@ -11,7 +13,6 @@ export async function loader({ request }: Route.LoaderArgs) {
   }
   return { user };
 }
-  */
 
 export default function TeacherSidebar() {
   const [className, setClassName] = useState("연애학개론 (M)");
