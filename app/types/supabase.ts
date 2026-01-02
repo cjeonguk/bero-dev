@@ -45,6 +45,7 @@ export type Database = {
           created_at: string;
           id: string;
           lecture_id: string | null;
+          period: number | null;
           status: Database["public"]["Enums"]["attendance_status"] | null;
           student_id: string | null;
         };
@@ -53,6 +54,7 @@ export type Database = {
           created_at?: string;
           id?: string;
           lecture_id?: string | null;
+          period?: number | null;
           status?: Database["public"]["Enums"]["attendance_status"] | null;
           student_id?: string | null;
         };
@@ -61,6 +63,7 @@ export type Database = {
           created_at?: string;
           id?: string;
           lecture_id?: string | null;
+          period?: number | null;
           status?: Database["public"]["Enums"]["attendance_status"] | null;
           student_id?: string | null;
         };
@@ -145,6 +148,7 @@ export type Database = {
           module: string | null;
           name: string | null;
           schedule: Json[] | null;
+          semester: string | null;
           teacher_id: string | null;
         };
         Insert: {
@@ -155,6 +159,7 @@ export type Database = {
           module?: string | null;
           name?: string | null;
           schedule?: Json[] | null;
+          semester?: string | null;
           teacher_id?: string | null;
         };
         Update: {
@@ -165,6 +170,7 @@ export type Database = {
           module?: string | null;
           name?: string | null;
           schedule?: Json[] | null;
+          semester?: string | null;
           teacher_id?: string | null;
         };
         Relationships: [
@@ -202,6 +208,50 @@ export type Database = {
         };
         Relationships: [];
       };
+      semester_schedules: {
+        Row: {
+          created_at: string;
+          end_date: string | null;
+          end_period: number | null;
+          id: number;
+          name: string | null;
+          period_schedules: Json[] | null;
+          school_id: string | null;
+          start_date: string | null;
+          start_period: number | null;
+        };
+        Insert: {
+          created_at?: string;
+          end_date?: string | null;
+          end_period?: number | null;
+          id?: number;
+          name?: string | null;
+          period_schedules?: Json[] | null;
+          school_id?: string | null;
+          start_date?: string | null;
+          start_period?: number | null;
+        };
+        Update: {
+          created_at?: string;
+          end_date?: string | null;
+          end_period?: number | null;
+          id?: number;
+          name?: string | null;
+          period_schedules?: Json[] | null;
+          school_id?: string | null;
+          start_date?: string | null;
+          start_period?: number | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "semester_schedules_school_id_fkey";
+            columns: ["school_id"];
+            isOneToOne: false;
+            referencedRelation: "schools";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       students: {
         Row: {
           created_at: string;
@@ -209,7 +259,7 @@ export type Database = {
           id: string;
           last_detected_place: string | null;
           name: string | null;
-          num: number | null;
+          num: string | null;
           school_id: string | null;
         };
         Insert: {
@@ -218,7 +268,7 @@ export type Database = {
           id?: string;
           last_detected_place?: string | null;
           name?: string | null;
-          num?: number | null;
+          num?: string | null;
           school_id?: string | null;
         };
         Update: {
@@ -227,7 +277,7 @@ export type Database = {
           id?: string;
           last_detected_place?: string | null;
           name?: string | null;
-          num?: number | null;
+          num?: string | null;
           school_id?: string | null;
         };
         Relationships: [
