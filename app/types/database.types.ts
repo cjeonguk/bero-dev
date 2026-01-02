@@ -251,7 +251,7 @@ export type Database = {
       students: {
         Row: {
           created_at: string;
-          device_name: string | null;
+          device_id: string | null;
           id: string;
           last_detected_place: string | null;
           name: string | null;
@@ -260,7 +260,7 @@ export type Database = {
         };
         Insert: {
           created_at?: string;
-          device_name?: string | null;
+          device_id?: string | null;
           id?: string;
           last_detected_place?: string | null;
           name?: string | null;
@@ -269,7 +269,7 @@ export type Database = {
         };
         Update: {
           created_at?: string;
-          device_name?: string | null;
+          device_id?: string | null;
           id?: string;
           last_detected_place?: string | null;
           name?: string | null;

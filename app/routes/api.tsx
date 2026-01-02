@@ -40,7 +40,7 @@ export async function action({ request }: Route.ActionArgs) {
         )
       `,
       )
-      .eq("device_name", body.deviceName)
+      .eq("device_id", body.deviceID)
       .single();
 
     if (studentError) throw studentError;
