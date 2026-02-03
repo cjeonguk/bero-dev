@@ -128,11 +128,23 @@ export async function loader({ request }: Route.LoaderArgs) {
     .eq("lecture_id", currentLecture.id)
     .eq("attendance_date", today)
     .eq("period", currentLecture.period);
+  const absentList: typeof attendances = [];
   if (getAttendancesError) {
-    throw new Error("error in retrieving attendances");
+    students.forEach(async ({ id }) => {
+      const { error: insertAttendancesError } = await supabase
+        .from("attendances")
+        .insert({
+          student_id: id,
+          lecture_id: currentLecture.id,
+          status: "absent",
+          period: currentLecture.period,
+        });
+      if (insertAttendancesError) throw new Error("Error in attendance");
+      absentList.push({ student_id: id, status: "absent" });
+    });
   }
 
-  for (const attendance of attendances) {
+  for (const attendance of attendances ?? absentList) {
     const student = students.find(
       (student) => student.id === attendance.student_id,
     );
