@@ -1,7 +1,6 @@
-import { useEffect, useState } from "react";
 import type { Route } from "./+types/dashboard";
 import { createClient } from "~/lib/supabase/server";
-import { redirect } from "react-router";
+import { Link, redirect } from "react-router";
 import { getDayName, localYYYYMMDD, timetzToMinutes } from "~/utils/dates";
 import type { Database } from "~/types/supabase";
 
@@ -19,7 +18,7 @@ type Student = {
   attendance: Database["public"]["Enums"]["attendance_status"];
 };
 
-export async function loader({ request }: Route.LoaderArgs) {
+export async function loader({ request, params }: Route.LoaderArgs) {
   const { supabase } = createClient(request);
   const {
     data: { user },
@@ -96,7 +95,10 @@ export async function loader({ request }: Route.LoaderArgs) {
       return nowMinutes >= startMinutes && nowMinutes < endMinutes;
     },
   )?.period;
-  const currentLecture = schedule[currentPeriod - semester.start_period!];
+  const currentLecture =
+    params["*"] === ""
+      ? schedule[currentPeriod - semester.start_period!]
+      : schedule.find((lecture) => lecture.id === params["*"]);
 
   if (!currentLecture?.id) return { schedule, currentLecture, students: [] };
 
@@ -160,22 +162,6 @@ export async function loader({ request }: Route.LoaderArgs) {
 
 export default function TeacherSidebar({ loaderData }: Route.ComponentProps) {
   const { schedule, currentLecture, students } = loaderData;
-  const [selectedLecture, setSelectedLecture] = useState<LecturePeriod | null>(
-    null,
-  );
-  const [selectedLectureStudents, setSelectedLectureStudents] = useState<
-    Student[]
-  >([]);
-
-  useEffect(() => {
-    if (currentLecture) {
-      setSelectedLecture(currentLecture);
-    }
-  }, [currentLecture]);
-
-  useEffect(() => {
-    setSelectedLectureStudents(students);
-  }, [students]);
 
   return (
     <div className="flex w-full h-[calc(100vh-6rem)]">
@@ -185,37 +171,39 @@ export default function TeacherSidebar({ loaderData }: Route.ComponentProps) {
         </div>
         <div className=" flex flex-col gap-1 p-12">
           {schedule.map((period, index) => (
-            <div
+            <Link
               key={index}
-              onClick={() => {
-                setSelectedLecture(schedule[index]);
-              }}
+              to={
+                schedule[index].id === undefined
+                  ? "#"
+                  : `/teacher/dashboard/${schedule[index].id}`
+              }
               className={`text-[28px] [font-variant-numeric:tabular-nums] leading-none hover:cursor-pointer py-2 rounded-sm ${period.period === currentLecture?.period ? "bg-amber-500" : ""}`}
             >
               <span className="font-semibold">{period.period}.</span>{" "}
               {period.name ?? "-"}
-            </div>
+            </Link>
           ))}
         </div>
       </div>
       <div className="flex flex-col grow self-center items-center px-28">
-        {selectedLecture && (
+        {currentLecture && (
           <>
             <div className="flex w-full max-w-6xl mb-10 items-center">
               <div className="text-[44px] mr-8 leading-none" tabIndex={0}>
-                {selectedLecture.name} ({selectedLecture.module ?? ""})
+                {currentLecture.name} ({currentLecture.module ?? ""})
               </div>
               <button className="flex items-center justify-center leading-none bg-[#e4e4e4] text-[24px] px-5 py-2 rounded-[32px] hover:cursor-pointer">
                 수정
               </button>
             </div>
             <div
-              className={`w-full max-w-6xl grid gap-2 ${selectedLectureStudents.length > 12 ? "content-stretch" : "grid-rows-4"} h-[480px]`}
+              className={`w-full max-w-6xl grid gap-2 ${students.length > 12 ? "content-stretch" : "grid-rows-4"} h-[480px]`}
               style={{
-                gridTemplateColumns: `repeat(${getColumnCount(selectedLectureStudents.length)}, minmax(0, 1fr))`,
+                gridTemplateColumns: `repeat(${getColumnCount(students.length)}, minmax(0, 1fr))`,
               }}
             >
-              {selectedLectureStudents.map((student) => (
+              {students.map((student) => (
                 <div
                   className={`flex flex-col items-center justify-center border-6 border-[#92A2C1] ${getAttendanceColor(student.attendance)}`}
                   key={student.id}
