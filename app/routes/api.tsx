@@ -1,6 +1,8 @@
 import { PostgrestError } from "@supabase/supabase-js";
+import { DateTime } from "luxon";
 import type { Route } from "./+types/api";
 import { createClient } from "~/lib/supabase/server";
+import { timetzToMinutes } from "~/utils/dates";
 
 interface Body {
   deviceID: string;
@@ -56,28 +58,21 @@ export async function action({ request }: Route.ActionArgs) {
     const periodSchedules = studentInfo.school.semester
       .period_schedules as unknown as PeriodSchedules[];
 
-    const todayStr = new Date().toISOString().split("T")[0];
-
-    const now = new Date();
+    const now = DateTime.now().setZone("Asia/Seoul").setLocale("en-US");
+    const todayStr = now.toFormat("yyyy-MM-dd");
 
     let currentPeriod = 0;
+    const nowMinutes = now.hour * 60 + now.minute;
 
     periodSchedules.forEach((element) => {
-      const startTime = new Date(`${todayStr}T${element.start_time}`);
-      const endTime = new Date(`${todayStr}T${element.start_time}`);
+      const startMinutes = timetzToMinutes(element.start_time);
+      const endMinutes = timetzToMinutes(element.end_time);
 
-      if (startTime <= now && now <= endTime) currentPeriod = element.period;
+      if (nowMinutes >= startMinutes && nowMinutes < endMinutes) {
+        currentPeriod = element.period;
+      }
     });
-
-    const days = [
-      "Sunday",
-      "Monday",
-      "Tuesday",
-      "Wednesday",
-      "Thursday",
-      "Friday",
-      "Saturday",
-    ];
+    const dayName = now.toFormat("cccc");
 
     const { data: classList, error: enrollmentError } = await supabase
       .from("enrollments")
@@ -99,7 +94,7 @@ export async function action({ request }: Route.ActionArgs) {
 
     const classInfo = classList.find((element) => {
       const schedules = element.lecture.schedule as unknown as Schedules[];
-      const schedule = schedules.find((obj) => obj?.day === days[now.getDay()]);
+      const schedule = schedules.find((obj) => obj?.day === dayName);
 
       return schedule?.period === currentPeriod;
     });
