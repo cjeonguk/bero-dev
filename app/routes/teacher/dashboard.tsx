@@ -1,7 +1,8 @@
 import type { Route } from "./+types/dashboard";
 import { createClient } from "~/lib/supabase/server";
 import { Link, redirect } from "react-router";
-import { getDayName, localYYYYMMDD, timetzToMinutes } from "~/utils/dates";
+import { DateTime } from "luxon";
+import { timetzToMinutes } from "~/utils/dates";
 import type { Database } from "~/types/supabase";
 
 type LecturePeriod = {
@@ -27,8 +28,8 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     return redirect("/login");
   }
 
-  const now = new Date();
-  const today = localYYYYMMDD(now); // TODO: consider timezone
+  const now = DateTime.now().setZone("Asia/Seoul").setLocale("en-US");
+  const today = now.toFormat("yyyy-MM-dd");
 
   const { data: teacher, error } = await supabase
     .from("teachers")
@@ -61,7 +62,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
   const schedule: LecturePeriod[] = [];
 
-  const dayName = getDayName(now);
+  const dayName = now.toFormat("cccc");
   for (const lecture of semesterLectures) {
     lecture
       .schedule!.filter((dayPeriod) => dayPeriod!.day === dayName)
@@ -87,7 +88,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
   schedule.sort((lecture1, lecture2) => lecture1.period - lecture2.period);
 
-  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  const nowMinutes = now.hour * 60 + now.minute;
   const currentPeriod = semester.period_schedules?.find(
     ({ start_time, end_time }) => {
       const startMinutes = timetzToMinutes(start_time);
