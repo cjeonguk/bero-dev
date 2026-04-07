@@ -101,30 +101,30 @@ export async function action({ request }: Route.ActionArgs) {
 
     const { data: classroomID, error: classroomError } = await supabase
       .from("classrooms")
-      .select("id")
-      .eq("name", body.classroom)
+      .select("name")
+      .eq("id", classInfo?.lecture.classroom_id ?? "")
       .single();
 
     if (classroomError) throw classroomError;
 
-    if (!classroomID || !classroomID.id)
+    if (!classroomID || !classroomID.name)
       return { success: false, studentName: studentInfo.name };
 
-    const { error: updateError } = await supabase
-      .from("students")
-      .update({ last_detected_place: classroomID.id })
-      .match({ name: studentInfo.name });
+    if (classroomID.name === body.classroom) {
+      const { error: updateError } = await supabase
+        .from("students")
+        .update({ last_detected_place: classInfo?.lecture.classroom_id })
+        .match({ id: studentInfo?.id });
 
-    if (updateError) throw updateError;
+      if (updateError) throw updateError;
 
-    if (classInfo?.lecture.classroom_id === classroomID.id) {
       // TODO: update - 수업 시작 시 자동으로 absent attendance row들이 생성되어야 함
       const { error: attendanceError } = await supabase
         .from("attendances")
         .update({ status: "present" })
         .match({
-          student_id: studentInfo.id,
-          lecture_id: classInfo.lecture.id,
+          student_id: studentInfo?.id,
+          lecture_id: classInfo?.lecture.id,
           attendance_date: todayStr,
         });
 
