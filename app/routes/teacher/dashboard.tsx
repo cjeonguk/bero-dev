@@ -3,7 +3,7 @@ import { createClient } from "~/lib/supabase/server";
 import { Link, redirect } from "react-router";
 import { DateTime } from "luxon";
 import { timetzToMinutes } from "~/utils/dates";
-import type { Database } from "~/types/supabase";
+import type { Database } from "~/types/database.types";
 
 type LecturePeriod = {
   id?: string;
@@ -42,7 +42,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
   const { data: semester, error: getSemesterError } = await supabase
     .from("semester_schedules")
-    .select("name, start_period, end_period, period_schedules")
+    .select("id, start_period, end_period, period_schedules")
     .eq("school_id", teacher.school_id!)
     .lte("start_date", today)
     .gte("end_date", today)
@@ -55,7 +55,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     .from("lectures")
     .select("schedule, id, name, module")
     .eq("teacher_id", teacher.id)
-    .eq("semester", semester.name!);
+    .eq("semester_id", semester.id!);
   if (getLecturesError) {
     throw new Error("error in retrieving lectures");
   }

@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.1";
   };
+  graphql_public: {
+    Tables: {
+      [_ in never]: never;
+    };
+    Views: {
+      [_ in never]: never;
+    };
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json;
+          operationName?: string;
+          query?: string;
+          variables?: Json;
+        };
+        Returns: Json;
+      };
+    };
+    Enums: {
+      [_ in never]: never;
+    };
+    CompositeTypes: {
+      [_ in never]: never;
+    };
+  };
   public: {
     Tables: {
       attendances: {
@@ -133,7 +158,7 @@ export type Database = {
           module: string | null;
           name: string | null;
           schedule: Json[] | null;
-          semester: string | null;
+          semester_id: number | null;
           teacher_id: string | null;
         };
         Insert: {
@@ -144,7 +169,7 @@ export type Database = {
           module?: string | null;
           name?: string | null;
           schedule?: Json[] | null;
-          semester?: string | null;
+          semester_id?: number | null;
           teacher_id?: string | null;
         };
         Update: {
@@ -155,10 +180,17 @@ export type Database = {
           module?: string | null;
           name?: string | null;
           schedule?: Json[] | null;
-          semester?: string | null;
+          semester_id?: number | null;
           teacher_id?: string | null;
         };
         Relationships: [
+          {
+            foreignKeyName: "lectures_semester_id_fkey";
+            columns: ["semester_id"];
+            isOneToOne: false;
+            referencedRelation: "semester_schedules";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "lecturess_classroom_id_fkey";
             columns: ["classroom_id"];
@@ -512,6 +544,9 @@ export type CompositeTypes<
     : never;
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       attendance_status: ["present", "absent", "late", "excused", "sick leave"],
