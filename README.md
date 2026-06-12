@@ -1,87 +1,62 @@
-# Welcome to React Router!
+# Bero Dev
 
-A modern, production-ready template for building full-stack React applications using React Router.
+Bero Dev is a school attendance management system built for real-time classroom attendance tracking.
 
-[![Open in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/github/remix-run/react-router-templates/tree/main/default)
+Teachers can view attendance for the current class, and the platform is designed to let students check their own attendance records as well. The project uses React Router for the web app and Supabase for authentication and database management.
 
 ## Features
 
-- 🚀 Server-side rendering
-- ⚡️ Hot Module Replacement (HMR)
-- 📦 Asset bundling and optimization
-- 🔄 Data loading and mutations
-- 🔒 TypeScript by default
-- 🎉 TailwindCSS for styling
-- 📖 [React Router docs](https://reactrouter.com/)
+- Teacher attendance dashboard
+- Attendance tracking by lecture, date, and period
+- Device-based attendance update API
+- Supabase email/password authentication
+- Timetable-based current class lookup
+- Structured school data model for students, teachers, classrooms, and enrollments
+
+## Tech Stack
+
+- React 19
+- React Router 7
+- TypeScript
+- Vite
+- Tailwind CSS 4
+- Supabase
+- Luxon
+- shadcn/ui
 
 ## Getting Started
 
-### Installation
-
-Install the dependencies:
+### Install dependencies
 
 ```bash
 npm install
 ```
 
-### Development
+### Environment variables
 
-Start the development server with HMR:
+Create `.env.local`:
+
+```env
+VITE_SUPABASE_URL=your_supabase_url
+VITE_SUPABASE_PUBLISHABLE_OR_ANON_KEY=your_supabase_anon_key
+```
+
+### Run locally
 
 ```bash
 npm run dev
 ```
 
-Your application will be available at `http://localhost:5173`.
+App URL:
 
-## Building for Production
-
-Create a production build:
-
-```bash
-npm run build
+```text
+http://localhost:5173
 ```
 
-## Deployment
+## Future Improvements
 
-### Docker Deployment
-
-To build and run using Docker:
-
-```bash
-docker build -t my-app .
-
-# Run the container
-docker run -p 3000:3000 my-app
-```
-
-The containerized application can be deployed to any platform that supports Docker, including:
-
-- AWS ECS
-- Google Cloud Run
-- Azure Container Apps
-- Digital Ocean App Platform
-- Fly.io
-- Railway
-
-### DIY Deployment
-
-If you're familiar with deploying Node applications, the built-in app server is production-ready.
-
-Make sure to deploy the output of `npm run build`
-
-```
-├── package.json
-├── package-lock.json (or pnpm-lock.yaml, or bun.lockb)
-├── build/
-│   ├── client/    # Static assets
-│   └── server/    # Server-side code
-```
-
-## Styling
-
-This template comes with [Tailwind CSS](https://tailwindcss.com/) already configured for a simple default starting experience. You can use whatever CSS framework you prefer.
-
----
-
-Built with ❤️ using React Router.
+- Student attendance history and report pages
+- Admin management workflows
+- Live realtime dashboard updates
+- Better access control and production-ready security policies
+- Automated tests and seed data
