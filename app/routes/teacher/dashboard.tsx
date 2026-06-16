@@ -48,6 +48,12 @@ type PeriodScheduleEntry = {
   end_time: string;
 };
 
+type DashboardViewState =
+  | "active-lecture"
+  | "day-finished"
+  | "no-semester"
+  | "no-selection";
+
 export async function loader({ request, params }: Route.LoaderArgs) {
   const { supabase } = createClient(request);
   const {
@@ -75,9 +81,21 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     .eq("school_id", teacher.school_id!)
     .lte("start_date", today)
     .gte("end_date", today)
-    .single();
+    .maybeSingle();
   if (getSemesterError) {
     throw new Error("error in retrieving semesters");
+  }
+
+  if (!semester) {
+    return {
+      schedule: [],
+      currentLecture: undefined,
+      students: [],
+      currentPeriod: undefined,
+      dateLabel: now.setLocale("ko-KR").toFormat("yyyy/MM/dd"),
+      weekdayLabel: now.setLocale("ko-KR").toFormat("ccc"),
+      viewState: "no-semester" as DashboardViewState,
+    };
   }
 
   const { data: semesterLectures, error: getLecturesError } = await supabase
@@ -92,7 +110,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   const schedule: LecturePeriod[] = [];
 
   const dayName = now.setLocale("en-US").toFormat("cccc");
-  for (const lecture of semesterLectures) {
+  for (const lecture of semesterLectures ?? []) {
     const lectureSchedule = (lecture.schedule ?? []) as LectureScheduleEntry[];
 
     lectureSchedule
@@ -127,6 +145,14 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     const endMinutes = timetzToMinutes(end_time);
     return nowMinutes >= startMinutes && nowMinutes < endMinutes;
   })?.period;
+  const lastPeriodEndMinutes = periodSchedules.reduce((latest, schedule) => {
+    const endMinutes = timetzToMinutes(schedule.end_time);
+    return Math.max(latest, endMinutes);
+  }, -1);
+  const isDayFinished =
+    currentPeriod === undefined &&
+    lastPeriodEndMinutes !== -1 &&
+    nowMinutes >= lastPeriodEndMinutes;
   const currentLecture =
     params["*"] === ""
       ? currentPeriod === undefined
@@ -142,6 +168,10 @@ export async function loader({ request, params }: Route.LoaderArgs) {
       currentPeriod,
       dateLabel: now.setLocale("ko-KR").toFormat("yyyy/MM/dd"),
       weekdayLabel: now.setLocale("ko-KR").toFormat("ccc"),
+      viewState:
+        params["*"] === "" && isDayFinished
+          ? ("day-finished" as DashboardViewState)
+          : ("no-selection" as DashboardViewState),
     };
   }
 
@@ -160,7 +190,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     throw new Error("error in retrieving enrollments");
   }
 
-  const students: Student[] = enrollments.map(({ student }) => ({
+  const students: Student[] = (enrollments ?? []).map(({ student }) => ({
     id: student.id,
     name: student.name!,
     num: student.num!,
@@ -215,20 +245,29 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     currentPeriod,
     dateLabel: now.setLocale("ko-KR").toFormat("yyyy/MM/dd"),
     weekdayLabel: now.setLocale("ko-KR").toFormat("ccc"),
+    viewState: "active-lecture" as DashboardViewState,
   };
 }
 
 export default function TeacherDashboard({ loaderData }: Route.ComponentProps) {
-  const { schedule, currentLecture, students, dateLabel, weekdayLabel } =
-    loaderData;
+  const {
+    schedule,
+    currentLecture,
+    students,
+    dateLabel,
+    weekdayLabel,
+    viewState,
+  } = loaderData;
   const presentCount = students.filter(
     (student) => student.attendance === "present",
   ).length;
+  const emptyState = getDashboardEmptyState(viewState);
+  const activeLecture = currentLecture as LecturePeriod;
 
   return (
-    <div className="h-[calc(100vh-6rem)] w-full bg-muted/30">
-      <div className="mx-auto flex h-full w-full max-w-[1400px] flex-col gap-4 p-4 lg:flex-row lg:gap-6 lg:p-6">
-        <Card className="w-full lg:w-80 lg:shrink-0">
+    <div className="flex min-h-full flex-1 w-full bg-muted/30">
+      <div className="mx-auto flex min-h-full w-full max-w-[1400px] flex-col gap-4 p-4 lg:flex-row lg:items-stretch lg:gap-6 lg:p-6">
+        <Card className="w-full lg:h-full lg:w-80 lg:shrink-0">
           <CardHeader className="pt-8 pb-1">
             <div className="flex items-center gap-2">
               <Button
@@ -290,30 +329,27 @@ export default function TeacherDashboard({ loaderData }: Route.ComponentProps) {
           </CardContent>
         </Card>
 
-        <div className="min-h-0 flex-1">
-          {!currentLecture ? (
-            <Card className="h-full min-h-[360px]">
+        <div className="min-h-0 flex-1 lg:h-full">
+          {viewState !== "active-lecture" ? (
+            <Card className="flex h-full min-h-[360px] flex-col">
               <CardContent className="flex h-full items-center justify-center">
                 <Empty className="max-w-lg border">
                   <EmptyHeader>
-                    <EmptyTitle>선택된 수업이 없습니다</EmptyTitle>
+                    <EmptyTitle>{emptyState.title}</EmptyTitle>
                     <EmptyDescription>
-                      왼쪽 시간표에서 수업을 선택하면 학생 출결 현황을 볼 수
-                      있습니다.
+                      {emptyState.description}
                     </EmptyDescription>
                   </EmptyHeader>
                 </Empty>
               </CardContent>
             </Card>
           ) : (
-            <Card className="min-h-0 h-full">
+            <Card className="flex min-h-0 h-full flex-col">
               <CardHeader>
-                <CardTitle className="text-2xl">
-                  {currentLecture.name}
-                </CardTitle>
+                <CardTitle className="text-2xl">{activeLecture.name}</CardTitle>
                 <CardDescription>
-                  {currentLecture.module ? `${currentLecture.module} | ` : ""}
-                  {currentLecture.period}교시 수업
+                  {activeLecture.module ? `${activeLecture.module} | ` : ""}
+                  {activeLecture.period}교시 수업
                 </CardDescription>
                 <CardAction className="flex flex-col items-end gap-2">
                   <Button type="button" variant="outline" size="sm">
@@ -379,6 +415,28 @@ export default function TeacherDashboard({ loaderData }: Route.ComponentProps) {
       </div>
     </div>
   );
+}
+
+function getDashboardEmptyState(viewState: DashboardViewState) {
+  if (viewState === "no-semester") {
+    return {
+      title: "현재 진행 중인 학기가 없습니다",
+      description: "학기 일정이 등록되었는지 확인해 주세요.",
+    };
+  }
+
+  if (viewState === "day-finished") {
+    return {
+      title: "오늘 수업이 모두 종료되었습니다",
+      description: "지난 수업을 보려면 왼쪽 시간표에서 선택하세요.",
+    };
+  }
+
+  return {
+    title: "선택된 수업이 없습니다",
+    description:
+      "왼쪽 시간표에서 수업을 선택하면 학생 출결 현황을 볼 수 있습니다.",
+  };
 }
 
 function getAttendancePresentation(
