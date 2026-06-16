@@ -11,10 +11,31 @@ import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import {
   type ActionFunctionArgs,
+  type LoaderFunctionArgs,
   Link,
+  data,
   redirect,
   useFetcher,
 } from "react-router";
+
+export async function loader({ request }: LoaderFunctionArgs) {
+  const { supabase, headers } = createClient(request);
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return data(null, { headers });
+  }
+
+  const { data: teacher } = await supabase
+    .from("teachers")
+    .select("id")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  return redirect(teacher ? "/teacher/dashboard" : "/", { headers });
+}
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { supabase, headers } = createClient(request);
