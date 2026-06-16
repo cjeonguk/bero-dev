@@ -17,7 +17,7 @@ export default function ProtectedPage() {
   const data = useLoaderData<typeof loader>();
 
   return (
-    <div className="flex items-center justify-center h-screen gap-2">
+    <div className="flex min-h-full items-center justify-center gap-2">
       <p>
         Hello{" "}
         <span className="text-primary font-semibold">{data.user.email}</span>
