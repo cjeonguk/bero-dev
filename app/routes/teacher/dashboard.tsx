@@ -37,6 +37,17 @@ type Student = {
   attendance: Database["public"]["Enums"]["attendance_status"];
 };
 
+type LectureScheduleEntry = {
+  day: string;
+  period: number;
+};
+
+type PeriodScheduleEntry = {
+  period: number;
+  start_time: string;
+  end_time: string;
+};
+
 export async function loader({ request, params }: Route.LoaderArgs) {
   const { supabase } = createClient(request);
   const {
@@ -82,14 +93,16 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
   const dayName = now.setLocale("en-US").toFormat("cccc");
   for (const lecture of semesterLectures) {
-    lecture
-      .schedule!.filter((dayPeriod) => dayPeriod!.day === dayName)
+    const lectureSchedule = (lecture.schedule ?? []) as LectureScheduleEntry[];
+
+    lectureSchedule
+      .filter((dayPeriod) => dayPeriod.day === dayName)
       .forEach((dayPeriod) => {
         schedule.push({
           id: lecture.id,
           name: lecture.name!,
           module: lecture.module!,
-          period: dayPeriod!.period,
+          period: dayPeriod.period,
         });
       });
   }
@@ -107,13 +120,13 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   schedule.sort((lecture1, lecture2) => lecture1.period - lecture2.period);
 
   const nowMinutes = now.hour * 60 + now.minute;
-  const currentPeriod = semester.period_schedules?.find(
-    ({ start_time, end_time }) => {
-      const startMinutes = timetzToMinutes(start_time);
-      const endMinutes = timetzToMinutes(end_time);
-      return nowMinutes >= startMinutes && nowMinutes < endMinutes;
-    },
-  )?.period;
+  const periodSchedules = (semester.period_schedules ??
+    []) as PeriodScheduleEntry[];
+  const currentPeriod = periodSchedules.find(({ start_time, end_time }) => {
+    const startMinutes = timetzToMinutes(start_time);
+    const endMinutes = timetzToMinutes(end_time);
+    return nowMinutes >= startMinutes && nowMinutes < endMinutes;
+  })?.period;
   const currentLecture =
     params["*"] === ""
       ? currentPeriod === undefined
