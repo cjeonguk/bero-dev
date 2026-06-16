@@ -411,14 +411,14 @@ function getAttendancePresentation(
   if (attendance === "excused") {
     return {
       label: "공결",
-      badgeVariant: "outline" as const,
-      cardClassName: "border-border bg-muted/30",
+      badgeVariant: "secondary" as const,
+      cardClassName: "border-border bg-muted/40",
     };
   }
 
   return {
     label: "병결",
-    badgeVariant: "ghost" as const,
-    cardClassName: "border-border bg-muted/20",
+    badgeVariant: "secondary" as const,
+    cardClassName: "border-border bg-muted/40",
   };
 }
