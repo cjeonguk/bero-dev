@@ -4,6 +4,24 @@ import { Link, redirect } from "react-router";
 import { DateTime } from "luxon";
 import { timetzToMinutes } from "~/utils/dates";
 import type { Database } from "~/types/database.types";
+import { Button } from "~/components/ui/button";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "~/components/ui/card";
+import { Badge } from "~/components/ui/badge";
+import { Separator } from "~/components/ui/separator";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
+} from "~/components/ui/empty";
+import { cn } from "~/lib/utils";
 
 type LecturePeriod = {
   id?: string;
@@ -28,7 +46,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     return redirect("/login");
   }
 
-  const now = DateTime.now().setZone("Asia/Seoul").setLocale("en-US");
+  const now = DateTime.now().setZone("Asia/Seoul");
   const today = now.toFormat("yyyy-MM-dd");
 
   const { data: teacher, error } = await supabase
@@ -62,7 +80,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
   const schedule: LecturePeriod[] = [];
 
-  const dayName = now.toFormat("cccc");
+  const dayName = now.setLocale("en-US").toFormat("cccc");
   for (const lecture of semesterLectures) {
     lecture
       .schedule!.filter((dayPeriod) => dayPeriod!.day === dayName)
@@ -98,10 +116,21 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   )?.period;
   const currentLecture =
     params["*"] === ""
-      ? schedule[currentPeriod - semester.start_period!]
+      ? currentPeriod === undefined
+        ? undefined
+        : schedule[currentPeriod - semester.start_period!]
       : schedule.find((lecture) => lecture.id === params["*"]);
 
-  if (!currentLecture?.id) return { schedule, currentLecture, students: [] };
+  if (!currentLecture?.id) {
+    return {
+      schedule,
+      currentLecture,
+      students: [],
+      currentPeriod,
+      dateLabel: now.setLocale("ko-KR").toFormat("yyyy/MM/dd"),
+      weekdayLabel: now.setLocale("ko-KR").toFormat("ccc"),
+    };
+  }
 
   const { data: enrollments, error: getEnrollmentsError } = await supabase
     .from("enrollments")
@@ -131,23 +160,35 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     .eq("lecture_id", currentLecture.id)
     .eq("attendance_date", today)
     .eq("period", currentLecture.period);
-  const absentList: typeof attendances = [];
   if (getAttendancesError) {
-    students.forEach(async ({ id }) => {
-      const { error: insertAttendancesError } = await supabase
-        .from("attendances")
-        .insert({
-          student_id: id,
-          lecture_id: currentLecture.id,
-          status: "absent",
-          period: currentLecture.period,
-        });
-      if (insertAttendancesError) throw new Error("Error in attendance");
-      absentList.push({ student_id: id, status: "absent" });
-    });
+    throw new Error("error in retrieving attendances");
   }
 
-  for (const attendance of attendances ?? absentList) {
+  let effectiveAttendances = attendances ?? [];
+
+  if (effectiveAttendances.length === 0 && students.length > 0) {
+    const attendanceRows = students.map(({ id }) => ({
+      student_id: id,
+      lecture_id: currentLecture.id,
+      attendance_date: today,
+      status: "absent" as const,
+      period: currentLecture.period,
+    }));
+
+    const { error: insertAttendancesError } = await supabase
+      .from("attendances")
+      .insert(attendanceRows);
+
+    if (insertAttendancesError)
+      throw new Error("error in creating attendances");
+
+    effectiveAttendances = attendanceRows.map(({ student_id, status }) => ({
+      student_id,
+      status,
+    }));
+  }
+
+  for (const attendance of effectiveAttendances) {
     const student = students.find(
       (student) => student.id === attendance.student_id,
     );
@@ -158,77 +199,213 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     schedule,
     currentLecture,
     students,
+    currentPeriod,
+    dateLabel: now.setLocale("ko-KR").toFormat("yyyy/MM/dd"),
+    weekdayLabel: now.setLocale("ko-KR").toFormat("ccc"),
   };
 }
 
-export default function TeacherSidebar({ loaderData }: Route.ComponentProps) {
-  const { schedule, currentLecture, students } = loaderData;
+export default function TeacherDashboard({ loaderData }: Route.ComponentProps) {
+  const { schedule, currentLecture, students, dateLabel, weekdayLabel } =
+    loaderData;
+  const presentCount = students.filter(
+    (student) => student.attendance === "present",
+  ).length;
 
   return (
-    <div className="flex w-full h-[calc(100vh-6rem)]">
-      <div className="flex flex-col self-center justify-center h-full bg-[#D9D9D9]">
-        <div className="text-[28px] border-b-2 border-black pt-5 pl-4 pb-2">
-          2025/11/21 [금]
-        </div>
-        <div className=" flex flex-col gap-1 p-12">
-          {schedule.map((period, index) => (
-            <Link
-              key={index}
-              to={
-                schedule[index].id === undefined
-                  ? "#"
-                  : `/teacher/dashboard/${schedule[index].id}`
-              }
-              className={`text-[28px] [font-variant-numeric:tabular-nums] leading-none hover:cursor-pointer py-2 rounded-sm ${period.period === currentLecture?.period ? "bg-amber-500" : ""}`}
-            >
-              <span className="font-semibold">{period.period}.</span>{" "}
-              {period.name ?? "-"}
-            </Link>
-          ))}
-        </div>
-      </div>
-      <div className="flex flex-col grow self-center items-center px-28">
-        {currentLecture && (
-          <>
-            <div className="flex w-full max-w-6xl mb-10 items-center">
-              <div className="text-[44px] mr-8 leading-none" tabIndex={0}>
-                {currentLecture.name} ({currentLecture.module ?? ""})
-              </div>
-              <button className="flex items-center justify-center leading-none bg-[#e4e4e4] text-[24px] px-5 py-2 rounded-[32px] hover:cursor-pointer">
-                수정
-              </button>
+    <div className="h-[calc(100vh-6rem)] w-full bg-muted/30">
+      <div className="mx-auto flex h-full w-full max-w-[1400px] flex-col gap-4 p-4 lg:flex-row lg:gap-6 lg:p-6">
+        <Card className="w-full lg:w-80 lg:shrink-0">
+          <CardHeader className="pt-8 pb-1">
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                aria-label="이전 날짜"
+              >
+                {"〈"}
+              </Button>
+              <p className="flex-1 text-center text-xl font-semibold [font-variant-numeric:tabular-nums]">
+                {dateLabel} {weekdayLabel}
+              </p>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                aria-label="다음 날짜"
+              >
+                {"〉"}
+              </Button>
             </div>
-            <div
-              className={`w-full max-w-6xl grid gap-2 ${students.length > 12 ? "content-stretch" : "grid-rows-4"} h-[480px]`}
-              style={{
-                gridTemplateColumns: `repeat(${getColumnCount(students.length)}, minmax(0, 1fr))`,
-              }}
-            >
-              {students.map((student) => (
-                <div
-                  className={`flex flex-col items-center justify-center border-6 border-[#92A2C1] ${getAttendanceColor(student.attendance)}`}
-                  key={student.id}
-                >
-                  <div className="text-[36px]">{student.name}</div>
-                  <div className="text-[16px]">{student.num}</div>
-                </div>
-              ))}
+          </CardHeader>
+          <CardContent className="pt-4">
+            <div className="flex flex-col gap-2">
+              {schedule.map((period) => {
+                const hasLecture = Boolean(period.id);
+                const isActive = period.period === currentLecture?.period;
+
+                if (!hasLecture) {
+                  return (
+                    <div
+                      key={`period-${period.period}`}
+                      className="flex h-10 items-center rounded-lg px-3 text-sm text-muted-foreground"
+                    >
+                      <span className="font-medium [font-variant-numeric:tabular-nums]">
+                        {period.period}교시 -
+                      </span>
+                    </div>
+                  );
+                }
+
+                return (
+                  <Button
+                    key={period.id}
+                    asChild
+                    variant={isActive ? "secondary" : "ghost"}
+                    className="h-10 justify-between"
+                  >
+                    <Link to={`/teacher/dashboard/${period.id}`}>
+                      <span className="truncate text-sm font-medium [font-variant-numeric:tabular-nums]">
+                        {period.period}교시 {period.name}
+                      </span>
+                    </Link>
+                  </Button>
+                );
+              })}
             </div>
-          </>
-        )}
+          </CardContent>
+        </Card>
+
+        <div className="min-h-0 flex-1">
+          {!currentLecture ? (
+            <Card className="h-full min-h-[360px]">
+              <CardContent className="flex h-full items-center justify-center">
+                <Empty className="max-w-lg border">
+                  <EmptyHeader>
+                    <EmptyTitle>선택된 수업이 없습니다</EmptyTitle>
+                    <EmptyDescription>
+                      왼쪽 시간표에서 수업을 선택하면 학생 출결 현황을 볼 수
+                      있습니다.
+                    </EmptyDescription>
+                  </EmptyHeader>
+                </Empty>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="min-h-0 h-full">
+              <CardHeader>
+                <CardTitle className="text-2xl">
+                  {currentLecture.name}
+                </CardTitle>
+                <CardDescription>
+                  {currentLecture.module ? `${currentLecture.module} | ` : ""}
+                  {currentLecture.period}교시 수업
+                </CardDescription>
+                <CardAction className="flex flex-col items-end gap-2">
+                  <Button type="button" variant="outline" size="sm">
+                    수정
+                  </Button>
+                  <p className="pr-2 text-sm text-muted-foreground">
+                    {presentCount}/{students.length}
+                  </p>
+                </CardAction>
+              </CardHeader>
+              <Separator />
+              <CardContent className="pt-4">
+                {students.length === 0 ? (
+                  <Empty className="min-h-[300px] border">
+                    <EmptyHeader>
+                      <EmptyTitle>등록된 학생이 없습니다</EmptyTitle>
+                      <EmptyDescription>
+                        현재 수업에 등록된 학생이 없어 출결을 표시할 수
+                        없습니다.
+                      </EmptyDescription>
+                    </EmptyHeader>
+                  </Empty>
+                ) : (
+                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                    {students.map((student) => {
+                      const attendancePresentation = getAttendancePresentation(
+                        student.attendance,
+                      );
+
+                      return (
+                        <Card
+                          key={student.id}
+                          className={cn(
+                            "py-4",
+                            attendancePresentation.cardClassName,
+                          )}
+                          size="sm"
+                        >
+                          <CardContent className="flex flex-col gap-2">
+                            <div className="flex items-start justify-between gap-2">
+                              <p className="truncate text-lg font-semibold">
+                                {student.name}
+                              </p>
+                              <Badge
+                                variant={attendancePresentation.badgeVariant}
+                              >
+                                {attendancePresentation.label}
+                              </Badge>
+                            </div>
+                            <p className="text-sm text-muted-foreground">
+                              {student.num}
+                            </p>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
-function getAttendanceColor(
+function getAttendancePresentation(
   attendance: Database["public"]["Enums"]["attendance_status"],
 ) {
-  if (attendance === "absent") return "bg-[#DB5555]";
-  return "bg-[#63D119]";
-}
+  if (attendance === "present") {
+    return {
+      label: "출석",
+      badgeVariant: "default" as const,
+      cardClassName: "border-primary/30 bg-primary/5",
+    };
+  }
 
-function getColumnCount(arrayLength: number) {
-  if (arrayLength <= 16) return 4;
-  return Math.ceil(Math.sqrt(arrayLength));
+  if (attendance === "absent") {
+    return {
+      label: "결석",
+      badgeVariant: "destructive" as const,
+      cardClassName: "border-destructive/30 bg-destructive/5",
+    };
+  }
+
+  if (attendance === "late") {
+    return {
+      label: "지각",
+      badgeVariant: "secondary" as const,
+      cardClassName: "border-border bg-muted/40",
+    };
+  }
+
+  if (attendance === "excused") {
+    return {
+      label: "공결",
+      badgeVariant: "outline" as const,
+      cardClassName: "border-border bg-muted/30",
+    };
+  }
+
+  return {
+    label: "병결",
+    badgeVariant: "ghost" as const,
+    cardClassName: "border-border bg-muted/20",
+  };
 }
