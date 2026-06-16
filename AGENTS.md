@@ -42,7 +42,6 @@
 - Load `react-router-framework-mode` before changing route wiring, loaders/actions, or framework-mode behavior.
 - Load `supabase` for any auth, database, migrations, RLS, or Supabase client/server work.
 - Load `shadcn` when adding or fixing shadcn/ui components.
-- Load `frontend-design` for substantial UI redesign work.
 
 ## UI And Styling
 - Shadcn is configured in `components.json`.
