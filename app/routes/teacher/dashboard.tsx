@@ -319,7 +319,7 @@ export default function TeacherDashboard({ loaderData }: Route.ComponentProps) {
                   <Button type="button" variant="outline" size="sm">
                     수정
                   </Button>
-                  <p className="pr-2 text-sm text-muted-foreground">
+                  <p className="pr-3.5 text-sm text-muted-foreground">
                     {presentCount}/{students.length}
                   </p>
                 </CardAction>
