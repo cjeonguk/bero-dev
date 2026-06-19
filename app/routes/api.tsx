@@ -1,8 +1,6 @@
 import { PostgrestError } from "@supabase/supabase-js";
 import { DateTime } from "luxon";
 import type { Route } from "./+types/api";
-import { createAttendanceRepository } from "~/repositories/attendance.server";
-import { ensureLectureAttendances } from "~/services/attendance.server";
 import { createClient } from "~/lib/supabase/server";
 import {
   getCurrentPeriod,
@@ -117,22 +115,20 @@ export async function action({ request }: Route.ActionArgs) {
 
       if (updateError) throw updateError;
 
-      await ensureLectureAttendances({
-        repository: createAttendanceRepository(supabase),
-        lectureId: classInfo.lecture.id,
-        attendanceDate: todayStr,
-        period: currentPeriod,
-      });
-
       const { error: attendanceError } = await supabase
         .from("attendances")
-        .update({ status: "present" })
-        .match({
-          student_id: studentInfo.id,
-          lecture_id: classInfo.lecture.id,
-          attendance_date: todayStr,
-          period: currentPeriod,
-        });
+        .upsert(
+          {
+            student_id: studentInfo.id,
+            lecture_id: classInfo.lecture.id,
+            attendance_date: todayStr,
+            period: currentPeriod,
+            status: "present",
+          },
+          {
+            onConflict: "student_id,lecture_id,attendance_date,period",
+          },
+        );
 
       if (attendanceError) throw attendanceError;
     }
