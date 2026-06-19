@@ -27,7 +27,8 @@ export default [
     ]),
 
     ...prefix("teacher", [
-      route("dashboard/*", "routes/teacher/dashboard.tsx"),
+      route("dashboard", "routes/teacher/dashboard.tsx"),
+      route("dashboard/:lectureId", "routes/teacher/dashboard-detail.tsx"),
       route("register-class", "routes/teacher/register-class.tsx"),
       ...prefix("school-admin", [
         route("dashboard", "routes/teacher/school-admin/dashboard.tsx"),

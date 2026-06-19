@@ -30,6 +30,7 @@ export default defineConfig([
   {
     files: [
       "app/root.tsx",
+      "app/layouts/**/*.tsx",
       "app/routes/**/*.tsx",
       "app/components/ui/**/*.tsx",
     ],
