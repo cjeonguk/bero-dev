@@ -151,7 +151,7 @@ function HeaderUserMenu({ user }: { user: HeaderUser }) {
       document.removeEventListener("pointerdown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [closeMenu]);
+  }, []);
 
   return (
     <div ref={containerRef} className="relative shrink-0">

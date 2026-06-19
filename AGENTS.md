@@ -1,32 +1,39 @@
 # AGENTS.md
 
 ## Repo Shape
+
 - Single-package React Router 7 app; not a monorepo.
 - App code lives under `app/`.
 - Route wiring is centralized in `app/routes.ts`; do not assume file-system auto-routing.
 - SSR is enabled in `react-router.config.ts`.
 
 ## Commands
+
 - Install: `npm install`
 - Dev server: `npm run dev`
+- Test: `npm run test`
+- Watch tests: `npm run test:watch`
 - Typecheck: `npm run typecheck`
 - Production build: `npm run build`
 - Serve built app: `npm run start`
 - There is no `npm run lint` script. For a manual lint pass, use `npx eslint app --ext .ts,.tsx`.
-- There is no test runner configured in `package.json`.
+- The default test runner is `Vitest`, currently set up for Node-based tests without browser UI testing libraries.
 
 ## Verification
-- Preferred verification for most app changes: `npm run typecheck` then `npm run build`.
+
+- Preferred verification for most app changes: `npm run test`, `npm run typecheck`, then `npm run build`.
 - `npm run typecheck` runs `react-router typegen && tsc`, so route types are generated as part of verification.
 - Pre-commit runs `npx lint-staged` only on staged `app/**/*.{js,mjs,cjs,ts,mts,cts,jsx,tsx}` files, applying `eslint --fix` and `prettier --write`.
 
 ## Routing And App Structure
+
 - Root HTML shell is `app/root.tsx`.
 - Shared layout wrapper is `app/layouts/main.tsx`.
 - Generated React Router types live under `.react-router/types`, and `tsconfig.json` includes that directory.
 - Path alias `~/*` maps to `app/*`.
 
 ## Supabase
+
 - Browser Supabase client: `app/lib/supabase/client.ts`.
 - Server-side loaders/actions use `app/lib/supabase/server.ts`.
 - When auth changes cookies on the server, return the `headers` from `createClient(request)` or session changes will not propagate correctly.
@@ -34,6 +41,7 @@
 - Database TypeScript types are in `app/types/database.types.ts`.
 
 ## MCP And Skills
+
 - `opencode.json` configures MCP for `shadcn` and local Supabase.
 - Use `shadcn` MCP to inspect/add components and examples instead of guessing registry commands.
 - Use Supabase MCP for schema inspection, SQL execution, type generation, docs lookup, and advisors when working on auth/database issues.
@@ -42,13 +50,17 @@
 - Load `react-router-framework-mode` before changing route wiring, loaders/actions, or framework-mode behavior.
 - Load `supabase` for any auth, database, migrations, RLS, or Supabase client/server work.
 - Load `shadcn` when adding or fixing shadcn/ui components.
+- Load `tdd` when the user explicitly wants test-first development, mentions red-green-refactor, or asks for integration tests. Confirm the target behaviors and public interface before implementation.
+- In this repo, start TDD with behavior-focused Vitest coverage for pure logic or server-side interfaces first; add browser UI testing tooling only when a concrete frontend UI test need appears.
 
 ## UI And Styling
+
 - Shadcn is configured in `components.json`.
-- The active shadcn style preset is `radix-nova`.
+- The active shadcn style preset is `radix-maia`.
 - Tailwind CSS entrypoint is `app/app.css`.
 
 ## Local Infra And Gotchas
+
 - Supabase local config is `supabase/config.toml`.
 - Local Supabase ports: API `54321`, DB `54322`, Studio `54323`, Inbucket `54324`.
 - `supabase/config.toml` references `supabase/seed.sql`, but that file is currently absent; do not assume seeded local data exists.

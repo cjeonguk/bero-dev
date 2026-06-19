@@ -1,8 +1,13 @@
 import { PostgrestError } from "@supabase/supabase-js";
 import { DateTime } from "luxon";
 import type { Route } from "./+types/api";
+import { createAttendanceRepository } from "~/repositories/attendance.server";
+import { ensureLectureAttendances } from "~/services/attendance.server";
 import { createClient } from "~/lib/supabase/server";
-import { timetzToMinutes } from "~/utils/dates";
+import {
+  getCurrentPeriod,
+  type PeriodScheduleEntry,
+} from "./teacher/dashboard.shared";
 
 interface Body {
   deviceID: string;
@@ -10,12 +15,6 @@ interface Body {
   deviceName: string;
   timestamp: string;
   classroom: string;
-}
-
-interface PeriodSchedules {
-  period: number;
-  start_time: string;
-  end_time: string;
 }
 
 interface Schedules {
@@ -56,22 +55,18 @@ export async function action({ request }: Route.ActionArgs) {
       return { success: false, studentName: "" };
 
     const periodSchedules = studentInfo.school.semester
-      .period_schedules as unknown as PeriodSchedules[];
+      .period_schedules as unknown as PeriodScheduleEntry[];
 
     const now = DateTime.now().setZone("Asia/Seoul").setLocale("en-US");
     const todayStr = now.toFormat("yyyy-MM-dd");
 
-    let currentPeriod = 0;
     const nowMinutes = now.hour * 60 + now.minute;
+    const currentPeriod = getCurrentPeriod(periodSchedules, nowMinutes);
 
-    periodSchedules.forEach((element) => {
-      const startMinutes = timetzToMinutes(element.start_time);
-      const endMinutes = timetzToMinutes(element.end_time);
+    if (currentPeriod === undefined) {
+      return { success: false, studentName: studentInfo.name };
+    }
 
-      if (nowMinutes >= startMinutes && nowMinutes < endMinutes) {
-        currentPeriod = element.period;
-      }
-    });
     const dayName = now.toFormat("cccc");
 
     const { data: classList, error: enrollmentError } = await supabase
@@ -99,10 +94,14 @@ export async function action({ request }: Route.ActionArgs) {
       return schedule?.period === currentPeriod;
     });
 
+    if (!classInfo?.lecture.id || !classInfo.lecture.classroom_id) {
+      return { success: false, studentName: studentInfo.name };
+    }
+
     const { data: classroomID, error: classroomError } = await supabase
       .from("classrooms")
       .select("name")
-      .eq("id", classInfo?.lecture.classroom_id ?? "")
+      .eq("id", classInfo.lecture.classroom_id)
       .single();
 
     if (classroomError) throw classroomError;
@@ -113,19 +112,26 @@ export async function action({ request }: Route.ActionArgs) {
     if (classroomID.name === body.classroom) {
       const { error: updateError } = await supabase
         .from("students")
-        .update({ last_detected_place: classInfo?.lecture.classroom_id })
-        .match({ id: studentInfo?.id });
+        .update({ last_detected_place: classInfo.lecture.classroom_id })
+        .match({ id: studentInfo.id });
 
       if (updateError) throw updateError;
 
-      // TODO: update - 수업 시작 시 자동으로 absent attendance row들이 생성되어야 함
+      await ensureLectureAttendances({
+        repository: createAttendanceRepository(supabase),
+        lectureId: classInfo.lecture.id,
+        attendanceDate: todayStr,
+        period: currentPeriod,
+      });
+
       const { error: attendanceError } = await supabase
         .from("attendances")
         .update({ status: "present" })
         .match({
-          student_id: studentInfo?.id,
-          lecture_id: classInfo?.lecture.id,
+          student_id: studentInfo.id,
+          lecture_id: classInfo.lecture.id,
           attendance_date: todayStr,
+          period: currentPeriod,
         });
 
       if (attendanceError) throw attendanceError;
