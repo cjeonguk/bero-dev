@@ -11,17 +11,18 @@
 
 - Install: `npm install`
 - Dev server: `npm run dev`
+- Format: `npm run format`
+- Lint: `npm run lint`
 - Test: `npm run test`
 - Watch tests: `npm run test:watch`
 - Typecheck: `npm run typecheck`
 - Production build: `npm run build`
 - Serve built app: `npm run start`
-- There is no `npm run lint` script. For a manual lint pass, use `npx eslint app --ext .ts,.tsx`.
 - The default test runner is `Vitest`, currently set up for Node-based tests without browser UI testing libraries.
 
 ## Verification
 
-- Preferred verification for most app changes: `npm run test`, `npm run typecheck`, then `npm run build`.
+- Preferred verification for most app changes: `npm run lint`, `npm run test`, `npm run typecheck`, then `npm run build`.
 - `npm run typecheck` runs `react-router typegen && tsc`, so route types are generated as part of verification.
 - Pre-commit runs `npx lint-staged` only on staged `app/**/*.{js,mjs,cjs,ts,mts,cts,jsx,tsx}` files, applying `eslint --fix` and `prettier --write`.
 
