@@ -2,20 +2,22 @@ import { DateTime } from "luxon";
 import { data, redirect } from "react-router";
 import { ScheduleSidebar } from "~/components/teacher-dashboard/schedule-sidebar";
 import { LectureAttendancePanel } from "~/components/teacher-dashboard/lecture-attendance-panel";
-import { createClient } from "~/lib/supabase/server";
-import { timetzToMinutes } from "~/utils/dates";
 import {
   buildTodaySchedule,
-  getCurrentPeriod,
   mergeStudentsWithAttendances,
   resolveDashboardViewState,
   selectLecture,
   type DashboardLecture,
   type DashboardStudentAttendance,
   type DashboardViewState,
+} from "~/features/teacher-dashboard/dashboard";
+import { createClient } from "~/lib/supabase/server";
+import { timetzToMinutes } from "~/utils/dates";
+import {
+  getCurrentPeriod,
   type LectureScheduleEntry,
   type PeriodScheduleEntry,
-} from "./dashboard.shared";
+} from "~/utils/schedules";
 
 export type TeacherDashboardLoaderData = {
   schedule: DashboardLecture[];

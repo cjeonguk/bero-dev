@@ -1,7 +1,7 @@
 import { Link } from "react-router";
+import type { DashboardLecture } from "~/features/teacher-dashboard/dashboard";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader } from "~/components/ui/card";
-import type { DashboardLecture } from "~/routes/teacher/dashboard.shared";
 
 export function ScheduleSidebar({
   schedule,
