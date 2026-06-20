@@ -1,13 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { action } from "../api";
-import { createClient } from "~/lib/supabase/server";
+import { createServiceRoleClient } from "~/lib/supabase/server";
 
 vi.mock("~/lib/supabase/server", () => ({
-  createClient: vi.fn(),
+  createServiceRoleClient: vi.fn(),
 }));
 
-const mockedCreateClient = vi.mocked(createClient);
+const mockedCreateServiceRoleClient = vi.mocked(createServiceRoleClient);
 
 type ActionSetupOptions = {
   requestClassroom?: string;
@@ -96,14 +96,12 @@ function setupActionTest(options: ActionSetupOptions = {}) {
     }),
   };
 
-  mockedCreateClient.mockReturnValue({
-    supabase,
-    headers: new Headers(),
-  } as never);
+  mockedCreateServiceRoleClient.mockReturnValue(supabase as never);
 
   const request = new Request("http://localhost/api", {
     method: "POST",
     headers: {
+      authorization: "Bearer test-device-token",
       "content-type": "application/json",
     },
     body: JSON.stringify({
@@ -136,10 +134,12 @@ describe("api route action", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-06-19T01:05:00.000Z"));
+    vi.stubEnv("DEVICE_API_TOKEN", "test-device-token");
   });
 
   afterEach(() => {
     vi.useRealTimers();
+    vi.unstubAllEnvs();
     vi.clearAllMocks();
   });
 
@@ -195,5 +195,25 @@ describe("api route action", () => {
 
     expect(updateStudentMatch).not.toHaveBeenCalled();
     expect(upsertAttendance).not.toHaveBeenCalled();
+  });
+
+  it("rejects requests without the device token", async () => {
+    const { request } = setupActionTest();
+    const unauthorizedRequest = new Request(request, {
+      headers: {
+        "content-type": "application/json",
+      },
+    });
+
+    const response = await action(createActionArgs(unauthorizedRequest));
+
+    expect(response).toBeInstanceOf(Response);
+    expect((response as Response).status).toBe(401);
+    await expect((response as Response).json()).resolves.toEqual({
+      success: false,
+      studentName: "",
+      error: "Unauthorized",
+    });
+    expect(mockedCreateServiceRoleClient).not.toHaveBeenCalled();
   });
 });

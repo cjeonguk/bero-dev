@@ -1,7 +1,7 @@
 import { PostgrestError } from "@supabase/supabase-js";
 import { DateTime } from "luxon";
 import type { Route } from "./+types/api";
-import { createClient } from "~/lib/supabase/server";
+import { createServiceRoleClient } from "~/lib/supabase/server";
 import { getCurrentPeriod, type PeriodScheduleEntry } from "~/utils/schedules";
 
 interface Body {
@@ -17,10 +17,40 @@ interface Schedules {
   period: number;
 }
 
+function getDeviceApiToken(request: Request) {
+  const authorization = request.headers.get("Authorization");
+
+  if (authorization?.startsWith("Bearer ")) {
+    return authorization.slice(7);
+  }
+
+  return request.headers.get("x-device-api-token");
+}
+
 export async function action({ request }: Route.ActionArgs) {
+  const configuredToken = process.env.DEVICE_API_TOKEN;
+
+  if (!configuredToken) {
+    return Response.json(
+      {
+        success: false,
+        studentName: "",
+        error: "Device API is not configured",
+      },
+      { status: 500 },
+    );
+  }
+
+  if (getDeviceApiToken(request) !== configuredToken) {
+    return Response.json(
+      { success: false, studentName: "", error: "Unauthorized" },
+      { status: 401 },
+    );
+  }
+
   const body = (await request.json()) as Body;
 
-  const { supabase } = createClient(request);
+  const supabase = createServiceRoleClient();
   try {
     const { data: studentInfo, error: studentError } = await supabase
       .from("students")
@@ -132,7 +162,13 @@ export async function action({ request }: Route.ActionArgs) {
 
     return { success: true, studentName: studentInfo.name };
   } catch (error) {
-    if (error instanceof PostgrestError)
+    if (error instanceof PostgrestError) {
       console.error("API ERROR:", error.message);
+    }
+
+    return Response.json(
+      { success: false, studentName: "", error: "Attendance update failed" },
+      { status: 500 },
+    );
   }
 }

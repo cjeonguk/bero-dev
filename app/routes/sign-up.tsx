@@ -12,13 +12,14 @@ import { Label } from "~/components/ui/label";
 import {
   type ActionFunctionArgs,
   Link,
+  data,
   redirect,
   useFetcher,
   useSearchParams,
 } from "react-router";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { supabase } = createClient(request);
+  const { supabase, headers } = createClient(request);
 
   const url = new URL(request.url);
   const origin = url.origin;
@@ -48,10 +49,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   });
 
   if (error) {
-    return { error: error.message };
+    return data({ error: error.message }, { headers });
   }
 
-  return redirect("/sign-up?success");
+  return redirect("/sign-up?success", { headers });
 };
 
 export default function SignUp() {
