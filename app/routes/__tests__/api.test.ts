@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { action } from "./api";
+import { action } from "../api";
 import { createClient } from "~/lib/supabase/server";
 
 vi.mock("~/lib/supabase/server", () => ({

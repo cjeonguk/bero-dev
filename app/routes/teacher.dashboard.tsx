@@ -1,5 +1,8 @@
-import type { Route } from "./+types/dashboard";
-import { loadTeacherDashboard, TeacherDashboardPage } from "./dashboard-page";
+import type { Route } from "./+types/teacher.dashboard";
+import {
+  loadTeacherDashboard,
+  TeacherDashboardPage,
+} from "~/features/teacher-dashboard/dashboard-page";
 
 export async function loader({ request }: Route.LoaderArgs) {
   return loadTeacherDashboard({ request });
