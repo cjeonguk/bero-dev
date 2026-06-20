@@ -1,10 +1,12 @@
 import { ChevronDown, LogOut, Settings } from "lucide-react";
 import {
   data,
+  Form,
   Link,
   Outlet,
   useLocation,
   useLoaderData,
+  useNavigation,
   type ShouldRevalidateFunctionArgs,
 } from "react-router";
 import {
@@ -126,6 +128,9 @@ export default function Main() {
 function HeaderUserMenu({ user }: { user: HeaderUser }) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const navigation = useNavigation();
+  const isLoggingOut =
+    navigation.state !== "idle" && navigation.formAction === "/logout";
 
   const closeMenu = useEffectEvent(() => {
     setOpen(false);
@@ -180,15 +185,17 @@ function HeaderUserMenu({ user }: { user: HeaderUser }) {
           className="absolute right-0 top-[calc(100%+0.5rem)] z-20 min-w-full overflow-hidden rounded-2xl border border-border bg-popover p-1 text-popover-foreground shadow-lg shadow-foreground/5"
         >
           <MenuItem icon={<Settings className="size-4" />}>설정</MenuItem>
-          <Link
-            to="/logout"
-            role="menuitem"
-            onClick={() => setOpen(false)}
-            className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm text-destructive transition-colors hover:bg-destructive/10"
-          >
-            <LogOut className="size-4" />
-            로그아웃
-          </Link>
+          <Form method="post" action="/logout">
+            <button
+              type="submit"
+              role="menuitem"
+              disabled={isLoggingOut}
+              className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm text-destructive transition-colors hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <LogOut className="size-4" />
+              로그아웃
+            </button>
+          </Form>
         </div>
       ) : null}
     </div>
