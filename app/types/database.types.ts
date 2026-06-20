@@ -357,51 +357,6 @@ export type Database = {
           },
         ];
       };
-      temporal_lectures: {
-        Row: {
-          classroom_id: string | null;
-          created_at: string;
-          id: string;
-          module: string | null;
-          name: string | null;
-          schedule: Json[] | null;
-          teacher_id: string | null;
-        };
-        Insert: {
-          classroom_id?: string | null;
-          created_at?: string;
-          id?: string;
-          module?: string | null;
-          name?: string | null;
-          schedule?: Json[] | null;
-          teacher_id?: string | null;
-        };
-        Update: {
-          classroom_id?: string | null;
-          created_at?: string;
-          id?: string;
-          module?: string | null;
-          name?: string | null;
-          schedule?: Json[] | null;
-          teacher_id?: string | null;
-        };
-        Relationships: [
-          {
-            foreignKeyName: "temporal_lectures_classroom_id_fkey";
-            columns: ["classroom_id"];
-            isOneToOne: false;
-            referencedRelation: "classrooms";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "temporal_lectures_teacher_id_fkey";
-            columns: ["teacher_id"];
-            isOneToOne: false;
-            referencedRelation: "teachers";
-            referencedColumns: ["id"];
-          },
-        ];
-      };
     };
     Views: {
       [_ in never]: never;
