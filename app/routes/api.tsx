@@ -2,10 +2,7 @@ import { PostgrestError } from "@supabase/supabase-js";
 import { DateTime } from "luxon";
 import type { Route } from "./+types/api";
 import { createClient } from "~/lib/supabase/server";
-import {
-  getCurrentPeriod,
-  type PeriodScheduleEntry,
-} from "./teacher/dashboard.shared";
+import { getCurrentPeriod, type PeriodScheduleEntry } from "~/utils/schedules";
 
 interface Body {
   deviceID: string;

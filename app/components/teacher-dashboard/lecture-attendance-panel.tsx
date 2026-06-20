@@ -1,4 +1,9 @@
 import type { Database } from "~/types/database.types";
+import type {
+  DashboardLecture,
+  DashboardStudentAttendance,
+  DashboardViewState,
+} from "~/features/teacher-dashboard/dashboard";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import {
@@ -17,11 +22,6 @@ import {
 } from "~/components/ui/empty";
 import { Separator } from "~/components/ui/separator";
 import { cn } from "~/lib/utils";
-import type {
-  DashboardLecture,
-  DashboardStudentAttendance,
-  DashboardViewState,
-} from "~/routes/teacher/dashboard.shared";
 
 export function LectureAttendancePanel({
   viewState,
