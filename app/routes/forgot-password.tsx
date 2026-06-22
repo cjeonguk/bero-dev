@@ -23,11 +23,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const email = formData.get("email") as string;
 
   const { supabase, headers } = createClient(request);
-  const origin = new URL(request.url).origin;
-
   // Send the actual reset password email
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${origin}/auth/confirm?next=/update-password`,
+    redirectTo: `${new URL(request.url).origin}/update-password`,
   });
 
   if (error) {
