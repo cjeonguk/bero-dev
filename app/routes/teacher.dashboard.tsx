@@ -11,7 +11,8 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 }
 
 export default function TeacherDashboard({ loaderData }: Route.ComponentProps) {
-  const { schedule, currentLecture, dateLabel, weekdayLabel } = loaderData;
+  const { schedule, currentLecture, selectedDate, dateLabel, weekdayLabel } =
+    loaderData;
 
   return (
     <div className="flex min-h-full flex-1 w-full bg-muted/30">
@@ -19,6 +20,7 @@ export default function TeacherDashboard({ loaderData }: Route.ComponentProps) {
         <ScheduleSidebar
           schedule={schedule}
           currentLecture={currentLecture}
+          selectedDate={selectedDate}
           dateLabel={dateLabel}
           weekdayLabel={weekdayLabel}
         />

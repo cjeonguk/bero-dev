@@ -56,7 +56,6 @@ describe("teacher dashboard helpers", () => {
       expect(
         selectLecture({
           schedule,
-          currentPeriod: 3,
           selectedLectureId: "lecture-2",
           selectedPeriod: 4,
         }),
@@ -67,26 +66,15 @@ describe("teacher dashboard helpers", () => {
       expect(
         selectLecture({
           schedule,
-          currentPeriod: 2,
           selectedLectureId: "lecture-2",
         }),
       ).toEqual(schedule[1]);
-    });
-
-    it("falls back to the current period when no lecture id is selected", () => {
-      expect(
-        selectLecture({
-          schedule,
-          currentPeriod: 2,
-        }),
-      ).toEqual(schedule[0]);
     });
 
     it("returns undefined when nothing can be selected", () => {
       expect(
         selectLecture({
           schedule,
-          currentPeriod: 5,
         }),
       ).toBeUndefined();
     });
@@ -116,7 +104,6 @@ describe("teacher dashboard helpers", () => {
           hasSemester: false,
           hasCurrentLecture: false,
           isDayFinished: false,
-          hasExplicitSelection: false,
         }),
       ).toBe("no-semester");
     });
@@ -127,7 +114,6 @@ describe("teacher dashboard helpers", () => {
           hasSemester: true,
           hasCurrentLecture: false,
           isDayFinished: true,
-          hasExplicitSelection: false,
         }),
       ).toBe("day-finished");
     });
@@ -138,7 +124,6 @@ describe("teacher dashboard helpers", () => {
           hasSemester: true,
           hasCurrentLecture: false,
           isDayFinished: false,
-          hasExplicitSelection: false,
         }),
       ).toBe("no-selection");
     });
@@ -149,7 +134,6 @@ describe("teacher dashboard helpers", () => {
           hasSemester: true,
           hasCurrentLecture: true,
           isDayFinished: false,
-          hasExplicitSelection: false,
         }),
       ).toBe("active-lecture");
     });

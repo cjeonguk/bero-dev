@@ -12,7 +12,6 @@ import {
 import { createClient } from "~/lib/supabase/server";
 import { timetzToMinutes } from "~/utils/dates";
 import {
-  getCurrentPeriod,
   type LectureScheduleEntry,
   type PeriodScheduleEntry,
 } from "~/utils/schedules";
@@ -21,7 +20,7 @@ export type TeacherDashboardLoaderData = {
   schedule: DashboardLecture[];
   currentLecture: DashboardLecture | undefined;
   students: DashboardStudentAttendance[];
-  currentPeriod: number | undefined;
+  selectedDate: string;
   dateLabel: string;
   weekdayLabel: string;
   viewState: DashboardViewState;
@@ -31,6 +30,18 @@ export function getSelectedPeriodFromRequest(request: Request) {
   const period = Number(new URL(request.url).searchParams.get("period"));
 
   return Number.isInteger(period) && period > 0 ? period : undefined;
+}
+
+export function getSelectedDateFromRequest(request: Request) {
+  const date = new URL(request.url).searchParams.get("date");
+
+  if (!date) {
+    return undefined;
+  }
+
+  const selectedDate = DateTime.fromISO(date, { zone: "Asia/Seoul" });
+
+  return selectedDate.isValid ? selectedDate.toFormat("yyyy-MM-dd") : undefined;
 }
 
 export async function loadTeacherDashboard({
@@ -50,8 +61,12 @@ export async function loadTeacherDashboard({
 
   const now = DateTime.now().setZone("Asia/Seoul");
   const today = now.toFormat("yyyy-MM-dd");
-  const dateLabel = now.setLocale("ko-KR").toFormat("yyyy/MM/dd");
-  const weekdayLabel = now.setLocale("ko-KR").toFormat("ccc");
+  const selectedDate = getSelectedDateFromRequest(request) ?? today;
+  const selectedDateTime = DateTime.fromISO(selectedDate, {
+    zone: "Asia/Seoul",
+  });
+  const dateLabel = selectedDateTime.setLocale("ko-KR").toFormat("yyyy/MM/dd");
+  const weekdayLabel = selectedDateTime.setLocale("ko-KR").toFormat("ccc");
 
   const { data: teacher, error } = await supabase
     .from("teachers")
@@ -70,8 +85,8 @@ export async function loadTeacherDashboard({
     .from("semester_schedules")
     .select("id, start_period, end_period, period_schedules")
     .eq("school_id", teacher.school_id)
-    .lte("start_date", today)
-    .gte("end_date", today)
+    .lte("start_date", selectedDate)
+    .gte("end_date", selectedDate)
     .maybeSingle();
   if (getSemesterError) {
     throw new Error("error in retrieving semesters");
@@ -83,7 +98,7 @@ export async function loadTeacherDashboard({
         schedule: [],
         currentLecture: undefined,
         students: [],
-        currentPeriod: undefined,
+        selectedDate,
         dateLabel,
         weekdayLabel,
         viewState: "no-semester",
@@ -109,7 +124,7 @@ export async function loadTeacherDashboard({
     throw new Error("error in retrieving lectures");
   }
 
-  const dayName = now.setLocale("en-US").toFormat("cccc");
+  const dayName = selectedDateTime.setLocale("en-US").toFormat("cccc");
   const selectedPeriod = getSelectedPeriodFromRequest(request);
   const schedule = buildTodaySchedule({
     lectures: (semesterLectures ?? []).map((lecture) => ({
@@ -126,17 +141,15 @@ export async function loadTeacherDashboard({
   const nowMinutes = now.hour * 60 + now.minute;
   const periodSchedules = (semester.period_schedules ??
     []) as PeriodScheduleEntry[];
-  const currentPeriod = getCurrentPeriod(periodSchedules, nowMinutes);
   const lastPeriodEndMinutes = periodSchedules.reduce((latest, schedule) => {
     return Math.max(latest, timetzToMinutes(schedule.end_time));
   }, -1);
   const isDayFinished =
-    currentPeriod === undefined &&
+    selectedDate === today &&
     lastPeriodEndMinutes !== -1 &&
     nowMinutes >= lastPeriodEndMinutes;
   const currentLecture = selectLecture({
     schedule,
-    currentPeriod,
     selectedLectureId: lectureId,
     selectedPeriod,
   });
@@ -147,14 +160,13 @@ export async function loadTeacherDashboard({
         schedule,
         currentLecture,
         students: [],
-        currentPeriod,
+        selectedDate,
         dateLabel,
         weekdayLabel,
         viewState: resolveDashboardViewState({
           hasSemester: true,
           hasCurrentLecture: false,
           isDayFinished,
-          hasExplicitSelection: Boolean(lectureId),
         }),
       },
       { headers },
@@ -186,7 +198,7 @@ export async function loadTeacherDashboard({
     .from("attendances")
     .select("student_id, status")
     .eq("lecture_id", currentLecture.id)
-    .eq("attendance_date", today)
+    .eq("attendance_date", selectedDate)
     .eq("period", currentLecture.period);
   if (getAttendancesError) {
     throw new Error("error in retrieving attendances");
@@ -200,7 +212,7 @@ export async function loadTeacherDashboard({
         students,
         attendances: attendances ?? [],
       }),
-      currentPeriod,
+      selectedDate,
       dateLabel,
       weekdayLabel,
       viewState: "active-lecture",

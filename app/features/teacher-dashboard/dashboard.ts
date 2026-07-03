@@ -68,29 +68,21 @@ export function buildTodaySchedule({
 
 export function selectLecture({
   schedule,
-  currentPeriod,
   selectedLectureId,
   selectedPeriod,
 }: {
   schedule: DashboardLecture[];
-  currentPeriod?: number;
   selectedLectureId?: string;
   selectedPeriod?: number;
 }) {
-  if (selectedLectureId) {
-    return schedule.find(
-      (lecture) =>
-        lecture.id === selectedLectureId &&
-        (selectedPeriod === undefined || lecture.period === selectedPeriod),
-    );
-  }
-
-  if (currentPeriod === undefined) {
+  if (!selectedLectureId) {
     return undefined;
   }
 
   return schedule.find(
-    (lecture) => lecture.id !== undefined && lecture.period === currentPeriod,
+    (lecture) =>
+      lecture.id === selectedLectureId &&
+      (selectedPeriod === undefined || lecture.period === selectedPeriod),
   );
 }
 
@@ -131,7 +123,6 @@ export function resolveDashboardViewState({
   hasSemester: boolean;
   hasCurrentLecture: boolean;
   isDayFinished: boolean;
-  hasExplicitSelection: boolean;
 }): DashboardViewState {
   if (!hasSemester) {
     return "no-semester";

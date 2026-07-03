@@ -1,20 +1,41 @@
 import { Link } from "react-router";
+import { DateTime } from "luxon";
 import type { DashboardLecture } from "~/features/teacher-dashboard/dashboard";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader } from "~/components/ui/card";
 
-export function getLectureSelectionHref(lectureId: string, period: number) {
-  return `/teacher/dashboard/${lectureId}?period=${period}`;
+export function getLectureSelectionHref(
+  lectureId: string,
+  period: number,
+  date: string,
+) {
+  return `/teacher/dashboard/${lectureId}?date=${date}&period=${period}`;
+}
+
+export function getDateNavigationHref({
+  date,
+  direction,
+}: {
+  date: string;
+  direction: "previous" | "next";
+}) {
+  const nextDate = DateTime.fromISO(date, { zone: "Asia/Seoul" })
+    .plus({ days: direction === "previous" ? -1 : 1 })
+    .toFormat("yyyy-MM-dd");
+
+  return `/teacher/dashboard?date=${nextDate}`;
 }
 
 export function ScheduleSidebar({
   schedule,
   currentLecture,
+  selectedDate,
   dateLabel,
   weekdayLabel,
 }: {
   schedule: DashboardLecture[];
   currentLecture: DashboardLecture | undefined;
+  selectedDate: string;
   dateLabel: string;
   weekdayLabel: string;
 }) {
@@ -22,24 +43,28 @@ export function ScheduleSidebar({
     <Card className="w-full lg:h-full lg:w-80 lg:shrink-0">
       <CardHeader className="pt-8 pb-1">
         <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            aria-label="이전 날짜"
-          >
-            {"〈"}
+          <Button variant="ghost" size="icon-sm" aria-label="이전 날짜" asChild>
+            <Link
+              to={getDateNavigationHref({
+                date: selectedDate,
+                direction: "previous",
+              })}
+            >
+              {"〈"}
+            </Link>
           </Button>
           <p className="flex-1 text-center text-xl font-semibold [font-variant-numeric:tabular-nums]">
             {dateLabel} {weekdayLabel}
           </p>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            aria-label="다음 날짜"
-          >
-            {"〉"}
+          <Button variant="ghost" size="icon-sm" aria-label="다음 날짜" asChild>
+            <Link
+              to={getDateNavigationHref({
+                date: selectedDate,
+                direction: "next",
+              })}
+            >
+              {"〉"}
+            </Link>
           </Button>
         </div>
       </CardHeader>
@@ -69,7 +94,13 @@ export function ScheduleSidebar({
                 variant={isActive ? "secondary" : "ghost"}
                 className="h-10 justify-between"
               >
-                <Link to={getLectureSelectionHref(lectureId, period.period)}>
+                <Link
+                  to={getLectureSelectionHref(
+                    lectureId,
+                    period.period,
+                    selectedDate,
+                  )}
+                >
                   <span className="truncate text-sm font-medium [font-variant-numeric:tabular-nums]">
                     {period.period}교시 {period.name}
                   </span>
