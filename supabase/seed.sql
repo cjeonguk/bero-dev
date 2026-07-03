@@ -443,6 +443,8 @@ INSERT INTO public.attendances (id, student_id, lecture_id, attendance_date, sta
   ('7837177a-560a-4dc0-953d-aa20b773c51a', '402eb316-0b6b-48bf-ba0e-a937d23a3d0f', '27d90ac4-63f6-4449-97ce-a586ce301ca2', '2026-03-03', 'absent', '2026-03-03 00:13:00+00', 3),
   ('7cc5789f-8cd9-41c6-a909-e82c3e0fd75c', 'd4889047-93e0-4441-8b15-dd7f370aeeb9', '27d90ac4-63f6-4449-97ce-a586ce301ca2', '2026-03-03', 'present', '2026-03-03 00:14:00+00', 3);
 
+SELECT internal.seed_daily_attendances(CURRENT_DATE);
+
 SELECT pg_catalog.setval('public.semester_schedules_id_seq', 3, true);
 
 RESET ALL;
