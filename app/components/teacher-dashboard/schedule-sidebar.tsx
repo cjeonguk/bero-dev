@@ -1,30 +1,11 @@
 import { Link } from "react-router";
-import { DateTime } from "luxon";
 import type { DashboardLecture } from "~/features/teacher-dashboard/dashboard";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader } from "~/components/ui/card";
-
-export function getLectureSelectionHref(
-  lectureId: string,
-  period: number,
-  date: string,
-) {
-  return `/teacher/dashboard/${lectureId}?date=${date}&period=${period}`;
-}
-
-export function getDateNavigationHref({
-  date,
-  direction,
-}: {
-  date: string;
-  direction: "previous" | "next";
-}) {
-  const nextDate = DateTime.fromISO(date, { zone: "Asia/Seoul" })
-    .plus({ days: direction === "previous" ? -1 : 1 })
-    .toFormat("yyyy-MM-dd");
-
-  return `/teacher/dashboard?date=${nextDate}`;
-}
+import {
+  getDateNavigationHref,
+  getLectureSelectionHref,
+} from "./schedule-sidebar.helpers";
 
 export function ScheduleSidebar({
   schedule,

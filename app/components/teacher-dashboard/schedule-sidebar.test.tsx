@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   getDateNavigationHref,
   getLectureSelectionHref,
-} from "./schedule-sidebar";
+} from "./schedule-sidebar.helpers";
 
 describe("ScheduleSidebar helpers", () => {
   it("builds a distinct href for each consecutive period of the same lecture", () => {
