@@ -70,13 +70,19 @@ export function selectLecture({
   schedule,
   currentPeriod,
   selectedLectureId,
+  selectedPeriod,
 }: {
   schedule: DashboardLecture[];
   currentPeriod?: number;
   selectedLectureId?: string;
+  selectedPeriod?: number;
 }) {
   if (selectedLectureId) {
-    return schedule.find((lecture) => lecture.id === selectedLectureId);
+    return schedule.find(
+      (lecture) =>
+        lecture.id === selectedLectureId &&
+        (selectedPeriod === undefined || lecture.period === selectedPeriod),
+    );
   }
 
   if (currentPeriod === undefined) {

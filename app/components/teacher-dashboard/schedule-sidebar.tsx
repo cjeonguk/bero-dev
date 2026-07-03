@@ -3,6 +3,10 @@ import type { DashboardLecture } from "~/features/teacher-dashboard/dashboard";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader } from "~/components/ui/card";
 
+export function getLectureSelectionHref(lectureId: string, period: number) {
+  return `/teacher/dashboard/${lectureId}?period=${period}`;
+}
+
 export function ScheduleSidebar({
   schedule,
   currentLecture,
@@ -42,10 +46,10 @@ export function ScheduleSidebar({
       <CardContent className="pt-4">
         <div className="flex flex-col gap-2">
           {schedule.map((period) => {
-            const hasLecture = Boolean(period.id);
+            const lectureId = period.id;
             const isActive = period.period === currentLecture?.period;
 
-            if (!hasLecture) {
+            if (!lectureId) {
               return (
                 <div
                   key={`period-${period.period}`}
@@ -60,12 +64,12 @@ export function ScheduleSidebar({
 
             return (
               <Button
-                key={period.id}
+                key={`${lectureId}-${period.period}`}
                 asChild
                 variant={isActive ? "secondary" : "ghost"}
                 className="h-10 justify-between"
               >
-                <Link to={`/teacher/dashboard/${period.id}`}>
+                <Link to={getLectureSelectionHref(lectureId, period.period)}>
                   <span className="truncate text-sm font-medium [font-variant-numeric:tabular-nums]">
                     {period.period}교시 {period.name}
                   </span>

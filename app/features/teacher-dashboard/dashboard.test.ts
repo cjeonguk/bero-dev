@@ -48,8 +48,20 @@ describe("teacher dashboard helpers", () => {
   describe("selectLecture", () => {
     const schedule = [
       { id: "lecture-1", name: "Algebra", period: 2 },
+      { id: "lecture-2", name: "Biology", period: 3 },
       { id: "lecture-2", name: "Biology", period: 4 },
     ];
+
+    it("selects the explicitly chosen period when the same lecture appears consecutively", () => {
+      expect(
+        selectLecture({
+          schedule,
+          currentPeriod: 3,
+          selectedLectureId: "lecture-2",
+          selectedPeriod: 4,
+        }),
+      ).toEqual(schedule[2]);
+    });
 
     it("prefers an explicitly selected lecture id", () => {
       expect(
@@ -74,7 +86,7 @@ describe("teacher dashboard helpers", () => {
       expect(
         selectLecture({
           schedule,
-          currentPeriod: 3,
+          currentPeriod: 5,
         }),
       ).toBeUndefined();
     });

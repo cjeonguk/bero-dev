@@ -248,8 +248,8 @@ INSERT INTO public.semester_schedules (
     '2026-02-01 09:15:00+00',
     'b8ab83ad-39f4-44b7-91c7-f28794adc666',
     '2026 Term 1',
-    '2026-02-02',
-    '2026-06-30',
+    CURRENT_DATE - 30,
+    CURRENT_DATE + 120,
     1,
     4,
     ARRAY[
@@ -264,8 +264,8 @@ INSERT INTO public.semester_schedules (
     '2026-03-01 09:15:00+00',
     'f52d2304-22cb-4ea0-88f8-a196c6ef02ae',
     '2026 Trial Term',
-    '2026-03-02',
-    '2026-06-30',
+    CURRENT_DATE - 30,
+    CURRENT_DATE + 120,
     1,
     4,
     ARRAY[
@@ -317,10 +317,15 @@ INSERT INTO public.lectures (
     '07993eea-ca5c-4902-b527-fcfeb7e5fdab',
     ARRAY[
       '{"day": "Monday", "period": 3}'::jsonb,
+      '{"day": "Monday", "period": 4}'::jsonb,
       '{"day": "Tuesday", "period": 3}'::jsonb,
+      '{"day": "Tuesday", "period": 4}'::jsonb,
       '{"day": "Wednesday", "period": 3}'::jsonb,
+      '{"day": "Wednesday", "period": 4}'::jsonb,
       '{"day": "Thursday", "period": 3}'::jsonb,
-      '{"day": "Friday", "period": 3}'::jsonb
+      '{"day": "Thursday", "period": 4}'::jsonb,
+      '{"day": "Friday", "period": 3}'::jsonb,
+      '{"day": "Friday", "period": 4}'::jsonb
     ],
     NULL,
     'PILOT',

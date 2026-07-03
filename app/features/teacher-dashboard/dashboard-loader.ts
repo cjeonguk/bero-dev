@@ -27,6 +27,12 @@ export type TeacherDashboardLoaderData = {
   viewState: DashboardViewState;
 };
 
+export function getSelectedPeriodFromRequest(request: Request) {
+  const period = Number(new URL(request.url).searchParams.get("period"));
+
+  return Number.isInteger(period) && period > 0 ? period : undefined;
+}
+
 export async function loadTeacherDashboard({
   request,
   lectureId,
@@ -104,6 +110,7 @@ export async function loadTeacherDashboard({
   }
 
   const dayName = now.setLocale("en-US").toFormat("cccc");
+  const selectedPeriod = getSelectedPeriodFromRequest(request);
   const schedule = buildTodaySchedule({
     lectures: (semesterLectures ?? []).map((lecture) => ({
       id: lecture.id,
@@ -131,6 +138,7 @@ export async function loadTeacherDashboard({
     schedule,
     currentPeriod,
     selectedLectureId: lectureId,
+    selectedPeriod,
   });
 
   if (!currentLecture?.id) {

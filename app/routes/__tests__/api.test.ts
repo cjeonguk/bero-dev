@@ -17,6 +17,13 @@ type ActionSetupOptions = {
     start_time: string;
     end_time: string;
   }>;
+  classList?: Array<{
+    lecture: {
+      id: string;
+      classroom_id: string;
+      schedule: Array<{ day: string; period: number }>;
+    };
+  }>;
 };
 
 function setupActionTest(options: ActionSetupOptions = {}) {
@@ -36,7 +43,7 @@ function setupActionTest(options: ActionSetupOptions = {}) {
     },
   };
 
-  const classList = [
+  const classList = options.classList ?? [
     {
       lecture: {
         id: "lecture-1",
@@ -179,6 +186,45 @@ describe("api route action", () => {
 
     expect(updateStudentMatch).not.toHaveBeenCalled();
     expect(upsertAttendance).not.toHaveBeenCalled();
+  });
+
+  it("writes attendance for the later period of a consecutive lecture", async () => {
+    const { request, upsertAttendance, updateStudentMatch } = setupActionTest({
+      currentPeriodSchedules: [
+        { period: 4, start_time: "10:00:00+09", end_time: "10:50:00+09" },
+      ],
+      classList: [
+        {
+          lecture: {
+            id: "lecture-1",
+            classroom_id: "classroom-1",
+            schedule: [
+              { day: "Friday", period: 3 },
+              { day: "Friday", period: 4 },
+            ],
+          },
+        },
+      ],
+    });
+
+    await expect(action(createActionArgs(request))).resolves.toEqual({
+      success: true,
+      studentName: "Kim",
+    });
+
+    expect(updateStudentMatch).toHaveBeenCalledWith({ id: "student-1" });
+    expect(upsertAttendance).toHaveBeenCalledWith(
+      {
+        student_id: "student-1",
+        lecture_id: "lecture-1",
+        attendance_date: "2026-06-19",
+        period: 4,
+        status: "present",
+      },
+      {
+        onConflict: "student_id,lecture_id,attendance_date,period",
+      },
+    );
   });
 
   it("returns false and skips writes when no current period matches", async () => {

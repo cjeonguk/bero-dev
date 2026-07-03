@@ -114,9 +114,11 @@ export async function action({ request }: Route.ActionArgs) {
 
     const classInfo = classList.find((element) => {
       const schedules = element.lecture.schedule as unknown as Schedules[];
-      const schedule = schedules.find((obj) => obj?.day === dayName);
 
-      return schedule?.period === currentPeriod;
+      return schedules.some(
+        (schedule) =>
+          schedule?.day === dayName && schedule.period === currentPeriod,
+      );
     });
 
     if (!classInfo?.lecture.id || !classInfo.lecture.classroom_id) {
