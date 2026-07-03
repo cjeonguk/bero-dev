@@ -1,9 +1,16 @@
-import { useOutletContext } from "react-router";
+import type { Route } from "./+types/teacher.dashboard.$lectureId";
 import { TeacherDashboardPanel } from "~/features/teacher-dashboard/dashboard-page";
-import type { TeacherDashboardOutletContext } from "~/routes/teacher.dashboard";
+import { loadTeacherDashboardLectureDetail } from "~/features/teacher-dashboard/dashboard-loader";
 
-export default function TeacherDashboardDetail() {
-  const loaderData = useOutletContext<TeacherDashboardOutletContext>();
+export async function loader({ request, params }: Route.LoaderArgs) {
+  return loadTeacherDashboardLectureDetail({
+    request,
+    lectureId: params.lectureId,
+  });
+}
 
+export default function TeacherDashboardDetail({
+  loaderData,
+}: Route.ComponentProps) {
   return <TeacherDashboardPanel loaderData={loaderData} />;
 }

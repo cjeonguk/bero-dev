@@ -1,13 +1,51 @@
 import type { Route } from "./+types/teacher.dashboard";
-import { Outlet } from "react-router";
+import { Outlet, type ShouldRevalidateFunctionArgs } from "react-router";
 import { ScheduleSidebar } from "~/components/teacher-dashboard/schedule-sidebar";
-import { loadTeacherDashboard } from "~/features/teacher-dashboard/dashboard-loader";
-import type { TeacherDashboardLoaderData } from "~/features/teacher-dashboard/dashboard-loader";
+import {
+  loadTeacherDashboardShell,
+  type TeacherDashboardShellLoaderData,
+} from "~/features/teacher-dashboard/dashboard-loader";
 
-export type TeacherDashboardOutletContext = TeacherDashboardLoaderData;
+export type TeacherDashboardOutletContext = TeacherDashboardShellLoaderData;
+
+export function shouldRevalidateTeacherDashboardShell({
+  currentUrl,
+  nextUrl,
+  formMethod,
+  actionResult,
+  defaultShouldRevalidate,
+}: Pick<
+  ShouldRevalidateFunctionArgs,
+  | "currentUrl"
+  | "nextUrl"
+  | "formMethod"
+  | "actionResult"
+  | "defaultShouldRevalidate"
+>) {
+  if (formMethod || actionResult !== undefined) {
+    return defaultShouldRevalidate;
+  }
+
+  const currentDate = currentUrl.searchParams.get("date");
+  const nextDate = nextUrl.searchParams.get("date");
+  const dashboardPathChanged =
+    currentUrl.pathname.startsWith("/teacher/dashboard") &&
+    nextUrl.pathname.startsWith("/teacher/dashboard") &&
+    currentUrl.pathname !== nextUrl.pathname;
+
+  if (dashboardPathChanged && currentDate === nextDate) {
+    return false;
+  }
+
+  return defaultShouldRevalidate;
+}
 
 export async function loader({ request, params }: Route.LoaderArgs) {
-  return loadTeacherDashboard({ request, lectureId: params.lectureId });
+  return loadTeacherDashboardShell({ request, lectureId: params.lectureId });
+}
+
+export function shouldRevalidate(args: ShouldRevalidateFunctionArgs) {
+  return shouldRevalidateTeacherDashboardShell(args);
 }
 
 export default function TeacherDashboard({ loaderData }: Route.ComponentProps) {

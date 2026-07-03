@@ -1,10 +1,19 @@
 import { LectureAttendancePanel } from "~/components/teacher-dashboard/lecture-attendance-panel";
-import type { TeacherDashboardLoaderData } from "~/features/teacher-dashboard/dashboard-loader";
+import type {
+  TeacherDashboardLectureDetailLoaderData,
+  TeacherDashboardShellLoaderData,
+} from "~/features/teacher-dashboard/dashboard-loader";
+
+type TeacherDashboardPanelData = Pick<
+  TeacherDashboardShellLoaderData,
+  "currentLecture" | "viewState"
+> &
+  Pick<TeacherDashboardLectureDetailLoaderData, "students">;
 
 export function TeacherDashboardPanel({
   loaderData,
 }: {
-  loaderData: TeacherDashboardLoaderData;
+  loaderData: TeacherDashboardPanelData;
 }) {
   const { currentLecture, students, viewState } = loaderData;
 

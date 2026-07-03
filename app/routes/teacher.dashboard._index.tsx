@@ -27,5 +27,13 @@ export default function TeacherDashboardIndex() {
     return <Navigate to={redirectHref} replace />;
   }
 
-  return <TeacherDashboardPanel loaderData={loaderData} />;
+  return (
+    <TeacherDashboardPanel
+      loaderData={{
+        currentLecture: loaderData.currentLecture,
+        students: [],
+        viewState: loaderData.viewState,
+      }}
+    />
+  );
 }
