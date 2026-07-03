@@ -49,15 +49,13 @@ export function shouldRevalidate(args: ShouldRevalidateFunctionArgs) {
 }
 
 export default function TeacherDashboard({ loaderData }: Route.ComponentProps) {
-  const { schedule, currentLecture, selectedDate, dateLabel, weekdayLabel } =
-    loaderData;
+  const { schedule, selectedDate, dateLabel, weekdayLabel } = loaderData;
 
   return (
     <div className="flex min-h-full flex-1 w-full bg-muted/30">
       <div className="mx-auto flex min-h-full w-full max-w-[1400px] flex-col gap-4 p-4 lg:flex-row lg:items-stretch lg:gap-6 lg:p-6">
         <ScheduleSidebar
           schedule={schedule}
-          currentLecture={currentLecture}
           selectedDate={selectedDate}
           dateLabel={dateLabel}
           weekdayLabel={weekdayLabel}

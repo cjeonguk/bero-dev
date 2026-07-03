@@ -1,25 +1,26 @@
-import { Link } from "react-router";
+import { Link, useLocation } from "react-router";
 import type { DashboardLecture } from "~/features/teacher-dashboard/dashboard";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader } from "~/components/ui/card";
 import {
   getDateNavigationHref,
   getLectureSelectionHref,
+  isLectureSelectionActive,
 } from "./schedule-sidebar.helpers";
 
 export function ScheduleSidebar({
   schedule,
-  currentLecture,
   selectedDate,
   dateLabel,
   weekdayLabel,
 }: {
   schedule: DashboardLecture[];
-  currentLecture: DashboardLecture | undefined;
   selectedDate: string;
   dateLabel: string;
   weekdayLabel: string;
 }) {
+  const location = useLocation();
+
   return (
     <Card className="w-full lg:h-full lg:w-80 lg:shrink-0">
       <CardHeader className="pt-8 pb-1">
@@ -53,7 +54,15 @@ export function ScheduleSidebar({
         <div className="flex flex-col gap-2">
           {schedule.map((period) => {
             const lectureId = period.id;
-            const isActive = period.period === currentLecture?.period;
+            const isActive = lectureId
+              ? isLectureSelectionActive({
+                  currentPathname: location.pathname,
+                  currentSearch: location.search,
+                  lectureId,
+                  period: period.period,
+                  selectedDate,
+                })
+              : false;
 
             if (!lectureId) {
               return (
