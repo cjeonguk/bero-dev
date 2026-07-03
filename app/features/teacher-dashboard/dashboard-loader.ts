@@ -283,19 +283,46 @@ export async function loadTeacherDashboardLectureDetailData({
   supabase?: DashboardSupabaseClient;
   userId?: string;
 }) {
+  const detailStartedAt = Date.now();
+  const selectedPeriod = getSelectedPeriodFromRequest(request);
+  const selectedDate = getSelectedDateFromRequest(request);
+
+  console.info("[dashboard:detail:start]", {
+    lectureId: lectureId ?? null,
+    date: selectedDate ?? null,
+    period: selectedPeriod ?? null,
+  });
+
   const dashboardSupabase = await getDashboardSupabaseClient({
     request,
     supabase,
   });
+
+  const authStartedAt = Date.now();
   await getDashboardUserId({
     supabase: dashboardSupabase,
     userId,
   });
+  console.info("[dashboard:detail:step]", {
+    step: "auth.getUser",
+    lectureId: lectureId ?? null,
+    date: selectedDate ?? null,
+    period: selectedPeriod ?? null,
+    durationMs: Date.now() - authStartedAt,
+  });
 
-  const { selectedDate, selectedDateTime } = getSelectedDateContext(request);
-  const selectedPeriod = getSelectedPeriodFromRequest(request);
+  const { selectedDate: resolvedSelectedDate, selectedDateTime } =
+    getSelectedDateContext(request);
 
   if (!lectureId) {
+    console.info("[dashboard:detail:end]", {
+      lectureId: null,
+      date: resolvedSelectedDate,
+      period: selectedPeriod ?? null,
+      totalDurationMs: Date.now() - detailStartedAt,
+      viewState: "no-selection",
+    });
+
     return {
       currentLecture: undefined,
       students: [],
@@ -303,11 +330,20 @@ export async function loadTeacherDashboardLectureDetailData({
     } satisfies TeacherDashboardLectureDetailLoaderData;
   }
 
+  const lectureQueryStartedAt = Date.now();
   const { data: lecture, error: getLectureError } = await dashboardSupabase
     .from("lectures")
     .select("id, name, module, schedule")
     .eq("id", lectureId)
     .maybeSingle();
+  console.info("[dashboard:detail:query]", {
+    query: "lecture",
+    lectureId,
+    date: resolvedSelectedDate,
+    period: selectedPeriod ?? null,
+    durationMs: Date.now() - lectureQueryStartedAt,
+    rowCount: lecture ? 1 : 0,
+  });
   if (getLectureError) {
     throw new Error("error in retrieving lecture");
   }
@@ -324,6 +360,14 @@ export async function loadTeacherDashboardLectureDetailData({
   });
 
   if (!currentLecture?.id) {
+    console.info("[dashboard:detail:end]", {
+      lectureId,
+      date: resolvedSelectedDate,
+      period: selectedPeriod ?? null,
+      totalDurationMs: Date.now() - detailStartedAt,
+      viewState: "no-selection",
+    });
+
     return {
       currentLecture: undefined,
       students: [],
@@ -331,25 +375,61 @@ export async function loadTeacherDashboardLectureDetailData({
     } satisfies TeacherDashboardLectureDetailLoaderData;
   }
 
+  const parallelQueriesStartedAt = Date.now();
   const [enrollmentsResult, attendancesResult] = await Promise.all([
-    dashboardSupabase
-      .from("enrollments")
-      .select(
-        `
+    (async () => {
+      const enrollmentsStartedAt = Date.now();
+      const result = await dashboardSupabase
+        .from("enrollments")
+        .select(
+          `
       student:student_id (
       id,
       name,
       num
       )`,
-      )
-      .eq("lecture_id", currentLecture.id),
-    dashboardSupabase
-      .from("attendances")
-      .select("student_id, status")
-      .eq("lecture_id", currentLecture.id)
-      .eq("attendance_date", selectedDate)
-      .eq("period", currentLecture.period),
+        )
+        .eq("lecture_id", currentLecture.id);
+
+      console.info("[dashboard:detail:query]", {
+        query: "enrollments",
+        lectureId: currentLecture.id,
+        date: resolvedSelectedDate,
+        period: currentLecture.period,
+        durationMs: Date.now() - enrollmentsStartedAt,
+        rowCount: result.data?.length ?? 0,
+      });
+
+      return result;
+    })(),
+    (async () => {
+      const attendancesStartedAt = Date.now();
+      const result = await dashboardSupabase
+        .from("attendances")
+        .select("student_id, status")
+        .eq("lecture_id", currentLecture.id)
+        .eq("attendance_date", resolvedSelectedDate)
+        .eq("period", currentLecture.period);
+
+      console.info("[dashboard:detail:query]", {
+        query: "attendances",
+        lectureId: currentLecture.id,
+        date: resolvedSelectedDate,
+        period: currentLecture.period,
+        durationMs: Date.now() - attendancesStartedAt,
+        rowCount: result.data?.length ?? 0,
+      });
+
+      return result;
+    })(),
   ]);
+  console.info("[dashboard:detail:step]", {
+    step: "parallelQueries",
+    lectureId: currentLecture.id,
+    date: resolvedSelectedDate,
+    period: currentLecture.period,
+    durationMs: Date.now() - parallelQueriesStartedAt,
+  });
 
   const { data: enrollments, error: getEnrollmentsError } = enrollmentsResult;
   if (getEnrollmentsError) {
@@ -367,12 +447,32 @@ export async function loadTeacherDashboardLectureDetailData({
     throw new Error("error in retrieving attendances");
   }
 
+  const mergeStartedAt = Date.now();
+  const mergedStudents = mergeStudentsWithAttendances({
+    students,
+    attendances: attendances ?? [],
+  });
+  console.info("[dashboard:detail:step]", {
+    step: "mergeStudentsWithAttendances",
+    lectureId: currentLecture.id,
+    date: resolvedSelectedDate,
+    period: currentLecture.period,
+    durationMs: Date.now() - mergeStartedAt,
+    studentCount: mergedStudents.length,
+  });
+
+  console.info("[dashboard:detail:end]", {
+    lectureId: currentLecture.id,
+    date: resolvedSelectedDate,
+    period: currentLecture.period,
+    totalDurationMs: Date.now() - detailStartedAt,
+    viewState: "active-lecture",
+    studentCount: mergedStudents.length,
+  });
+
   return {
     currentLecture,
-    students: mergeStudentsWithAttendances({
-      students,
-      attendances: attendances ?? [],
-    }),
+    students: mergedStudents,
     viewState: "active-lecture",
   } satisfies TeacherDashboardLectureDetailLoaderData;
 }
