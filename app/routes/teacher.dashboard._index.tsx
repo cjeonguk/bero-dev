@@ -7,13 +7,13 @@ export function getTeacherDashboardIndexRedirectHref(
   schedule: DashboardLecture[],
   selectedDate: string,
 ) {
-  const firstLecture = schedule.find((lecture) => lecture.id);
+  const firstLecture = schedule.find((lecture) => lecture.sessionId);
 
-  if (!firstLecture?.id) {
+  if (!firstLecture?.sessionId) {
     return undefined;
   }
 
-  return `/teacher/dashboard/${firstLecture.id}?date=${selectedDate}&period=${firstLecture.period}`;
+  return `/teacher/dashboard/${firstLecture.sessionId}?date=${selectedDate}`;
 }
 
 export default function TeacherDashboardIndex() {

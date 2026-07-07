@@ -2,17 +2,14 @@ import { describe, expect, it } from "vitest";
 
 import {
   getDateNavigationHref,
-  isLectureSelectionActive,
-  getLectureSelectionHref,
+  isSessionSelectionActive,
+  getSessionSelectionHref,
 } from "./schedule-sidebar.helpers";
 
 describe("ScheduleSidebar helpers", () => {
-  it("builds a distinct href for each consecutive period of the same lecture", () => {
-    expect(getLectureSelectionHref("lecture-2", 3, "2026-07-03")).toBe(
-      "/teacher/dashboard/lecture-2?date=2026-07-03&period=3",
-    );
-    expect(getLectureSelectionHref("lecture-2", 4, "2026-07-03")).toBe(
-      "/teacher/dashboard/lecture-2?date=2026-07-03&period=4",
+  it("builds a session selection href", () => {
+    expect(getSessionSelectionHref("session-2", "2026-07-03")).toBe(
+      "/teacher/dashboard/session-2?date=2026-07-03",
     );
   });
 
@@ -31,45 +28,41 @@ describe("ScheduleSidebar helpers", () => {
     ).toBe("/teacher/dashboard?date=2026-07-04");
   });
 
-  it("treats the matching lecture path and period as active without loader state", () => {
+  it("treats the matching session path as active without loader state", () => {
     expect(
-      isLectureSelectionActive({
-        currentPathname: "/teacher/dashboard/lecture-2",
-        currentSearch: "?date=2026-07-03&period=4",
-        lectureId: "lecture-2",
-        period: 4,
+      isSessionSelectionActive({
+        currentPathname: "/teacher/dashboard/session-2",
+        currentSearch: "?date=2026-07-03",
+        sessionId: "session-2",
         selectedDate: "2026-07-03",
       }),
     ).toBe(true);
 
     expect(
-      isLectureSelectionActive({
-        currentPathname: "/teacher/dashboard/lecture-1",
-        currentSearch: "?date=2026-07-03&period=4",
-        lectureId: "lecture-2",
-        period: 4,
+      isSessionSelectionActive({
+        currentPathname: "/teacher/dashboard/session-1",
+        currentSearch: "?date=2026-07-03",
+        sessionId: "session-2",
         selectedDate: "2026-07-03",
       }),
     ).toBe(false);
   });
 
-  it("distinguishes consecutive periods of the same lecture", () => {
+  it("requires the selected date to match", () => {
     expect(
-      isLectureSelectionActive({
-        currentPathname: "/teacher/dashboard/lecture-2",
-        currentSearch: "?date=2026-07-03&period=3",
-        lectureId: "lecture-2",
-        period: 4,
+      isSessionSelectionActive({
+        currentPathname: "/teacher/dashboard/session-2",
+        currentSearch: "?date=2026-07-04",
+        sessionId: "session-2",
         selectedDate: "2026-07-03",
       }),
     ).toBe(false);
 
     expect(
-      isLectureSelectionActive({
-        currentPathname: "/teacher/dashboard/lecture-2",
-        currentSearch: "?date=2026-07-03&period=4",
-        lectureId: "lecture-2",
-        period: 4,
+      isSessionSelectionActive({
+        currentPathname: "/teacher/dashboard/session-2",
+        currentSearch: "?date=2026-07-03",
+        sessionId: "session-2",
         selectedDate: "2026-07-03",
       }),
     ).toBe(true);

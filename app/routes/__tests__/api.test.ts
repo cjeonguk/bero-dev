@@ -17,12 +17,13 @@ type ActionSetupOptions = {
     start_time: string;
     end_time: string;
   }>;
-  classList?: Array<{
-    lecture: {
-      id: string;
-      classroom_id: string;
-      schedule: Array<{ day: string; period: number }>;
-    };
+  enrollments?: Array<{ lecture_id: string }>;
+  specialSessionEnrollments?: Array<{ lecture_session_id: string }>;
+  currentSessions?: Array<{
+    id: string;
+    lecture_id: string | null;
+    classroom_id: string;
+    classroom: { name: string };
   }>;
 };
 
@@ -34,6 +35,7 @@ function setupActionTest(options: ActionSetupOptions = {}) {
     name: "Kim",
     id: "student-1",
     school: {
+      id: "school-1",
       semester: {
         id: 1,
         period_schedules: options.currentPeriodSchedules ?? [
@@ -43,13 +45,14 @@ function setupActionTest(options: ActionSetupOptions = {}) {
     },
   };
 
-  const classList = options.classList ?? [
+  const enrollments = options.enrollments ?? [{ lecture_id: "lecture-1" }];
+  const specialSessionEnrollments = options.specialSessionEnrollments ?? [];
+  const currentSessions = options.currentSessions ?? [
     {
-      lecture: {
-        id: "lecture-1",
-        classroom_id: "classroom-1",
-        schedule: [{ day: "Friday", period: 2 }],
-      },
+      id: "session-1",
+      lecture_id: "lecture-1",
+      classroom_id: "classroom-1",
+      classroom: { name: options.detectedClassroomName ?? "Room A" },
     },
   ];
 
@@ -73,21 +76,34 @@ function setupActionTest(options: ActionSetupOptions = {}) {
       if (table === "enrollments") {
         return {
           select: vi.fn(() => ({
-            match: vi.fn().mockResolvedValue({ data: classList, error: null }),
+            match: vi
+              .fn()
+              .mockResolvedValue({ data: enrollments, error: null }),
           })),
         };
       }
 
-      if (table === "classrooms") {
+      if (table === "lecture_session_enrollments") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn().mockResolvedValue({
+              data: specialSessionEnrollments,
+              error: null,
+            }),
+          })),
+        };
+      }
+
+      if (table === "lecture_sessions") {
         return {
           select: vi.fn(() => ({
             eq: vi.fn(() => ({
-              single: vi.fn().mockResolvedValue({
-                data: {
-                  name: options.detectedClassroomName ?? "Room A",
-                },
-                error: null,
-              }),
+              eq: vi.fn(() => ({
+                eq: vi.fn().mockResolvedValue({
+                  data: currentSessions,
+                  error: null,
+                }),
+              })),
             })),
           })),
         };
@@ -163,12 +179,13 @@ describe("api route action", () => {
       {
         student_id: "student-1",
         lecture_id: "lecture-1",
+        lecture_session_id: "session-1",
         attendance_date: "2026-06-19",
         period: 2,
         status: "present",
       },
       {
-        onConflict: "student_id,lecture_id,attendance_date,period",
+        onConflict: "student_id,lecture_session_id",
       },
     );
   });
@@ -180,7 +197,7 @@ describe("api route action", () => {
     });
 
     await expect(action(createActionArgs(request))).resolves.toEqual({
-      success: true,
+      success: false,
       studentName: "Kim",
     });
 
@@ -193,16 +210,12 @@ describe("api route action", () => {
       currentPeriodSchedules: [
         { period: 4, start_time: "10:00:00+09", end_time: "10:50:00+09" },
       ],
-      classList: [
+      currentSessions: [
         {
-          lecture: {
-            id: "lecture-1",
-            classroom_id: "classroom-1",
-            schedule: [
-              { day: "Friday", period: 3 },
-              { day: "Friday", period: 4 },
-            ],
-          },
+          id: "session-4",
+          lecture_id: "lecture-1",
+          classroom_id: "classroom-1",
+          classroom: { name: "Room A" },
         },
       ],
     });
@@ -217,12 +230,48 @@ describe("api route action", () => {
       {
         student_id: "student-1",
         lecture_id: "lecture-1",
+        lecture_session_id: "session-4",
         attendance_date: "2026-06-19",
         period: 4,
         status: "present",
       },
       {
-        onConflict: "student_id,lecture_id,attendance_date,period",
+        onConflict: "student_id,lecture_session_id",
+      },
+    );
+  });
+
+  it("writes attendance for a standalone special session", async () => {
+    const { request, upsertAttendance, updateStudentMatch } = setupActionTest({
+      enrollments: [],
+      specialSessionEnrollments: [{ lecture_session_id: "session-special" }],
+      currentSessions: [
+        {
+          id: "session-special",
+          lecture_id: null,
+          classroom_id: "classroom-1",
+          classroom: { name: "Room A" },
+        },
+      ],
+    });
+
+    await expect(action(createActionArgs(request))).resolves.toEqual({
+      success: true,
+      studentName: "Kim",
+    });
+
+    expect(updateStudentMatch).toHaveBeenCalledWith({ id: "student-1" });
+    expect(upsertAttendance).toHaveBeenCalledWith(
+      {
+        student_id: "student-1",
+        lecture_id: null,
+        lecture_session_id: "session-special",
+        attendance_date: "2026-06-19",
+        period: 2,
+        status: "present",
+      },
+      {
+        onConflict: "student_id,lecture_session_id",
       },
     );
   });

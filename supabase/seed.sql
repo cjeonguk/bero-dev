@@ -434,14 +434,105 @@ INSERT INTO public.enrollments (created_at, student_id, lecture_id, semester_id)
   ('2026-03-01 10:03:00+00', '402eb316-0b6b-48bf-ba0e-a937d23a3d0f', '27d90ac4-63f6-4449-97ce-a586ce301ca2', 3),
   ('2026-03-01 10:04:00+00', '68bf72f4-27f0-4a4f-a0f9-167e4af752dd', '27d90ac4-63f6-4449-97ce-a586ce301ca2', 3);
 
-INSERT INTO public.attendances (id, student_id, lecture_id, attendance_date, status, created_at, period) VALUES
-  ('53381d07-1401-445f-9acd-e0bcd8dfb1ee', '1b212df6-4669-4d50-b835-50dd47ac94cb', 'e728bdd7-e6c5-4484-8899-a94ccff997a6', '2026-01-05', 'present', '2026-01-05 00:10:00+00', 1),
-  ('4060469d-29bd-4772-afb6-920f692d7960', '1cde6571-6958-4e1b-9402-402d64a245fa', 'e728bdd7-e6c5-4484-8899-a94ccff997a6', '2026-01-06', 'absent', '2026-01-06 00:10:00+00', 3),
-  ('dd186094-be56-4023-8c17-acc8b2e545f3', '664d6972-cdd6-4205-bfd0-2caca1278897', '27d90ac4-63f6-4449-97ce-a586ce301ca2', '2026-03-03', 'absent', '2026-03-03 00:10:00+00', 3),
-  ('d9bbd4eb-84a7-4ad5-b554-c1b4bc9ab2ca', '68bf72f4-27f0-4a4f-a0f9-167e4af752dd', '27d90ac4-63f6-4449-97ce-a586ce301ca2', '2026-03-03', 'absent', '2026-03-03 00:11:00+00', 3),
-  ('b850a3c0-7b36-4a72-89e8-0df4aae9b872', '0cd16b9e-14d7-4da7-bcab-a699906ccbb0', '27d90ac4-63f6-4449-97ce-a586ce301ca2', '2026-03-03', 'absent', '2026-03-03 00:12:00+00', 3),
-  ('7837177a-560a-4dc0-953d-aa20b773c51a', '402eb316-0b6b-48bf-ba0e-a937d23a3d0f', '27d90ac4-63f6-4449-97ce-a586ce301ca2', '2026-03-03', 'absent', '2026-03-03 00:13:00+00', 3),
-  ('7cc5789f-8cd9-41c6-a909-e82c3e0fd75c', 'd4889047-93e0-4441-8b15-dd7f370aeeb9', '27d90ac4-63f6-4449-97ce-a586ce301ca2', '2026-03-03', 'present', '2026-03-03 00:14:00+00', 3);
+SELECT internal.refresh_lecture_sessions('dd539db3-5e72-4403-9927-9c0919235cf2', '2026-01-05');
+SELECT internal.refresh_lecture_sessions('e728bdd7-e6c5-4484-8899-a94ccff997a6', '2026-01-05');
+SELECT internal.refresh_lecture_sessions('e777e570-72fa-48a5-bda9-e180a60bcd59', CURRENT_DATE - 30);
+SELECT internal.refresh_lecture_sessions('8399efd3-ce4a-46c0-8c06-c3b3bd6cd978', CURRENT_DATE - 30);
+SELECT internal.refresh_lecture_sessions('27d90ac4-63f6-4449-97ce-a586ce301ca2', CURRENT_DATE - 30);
+
+INSERT INTO public.lecture_sessions (
+  id,
+  created_at,
+  lecture_id,
+  school_id,
+  semester_id,
+  name,
+  module,
+  session_date,
+  period,
+  classroom_id,
+  teacher_id,
+  kind,
+  note
+) VALUES
+  (
+    '5bc65875-f317-4efb-b9a9-53612aabf536',
+    CURRENT_TIMESTAMP,
+    NULL,
+    'b8ab83ad-39f4-44b7-91c7-f28794adc666',
+    2,
+    'Guest Seminar',
+    'SPECIAL-1',
+    CURRENT_DATE,
+    4,
+    '946388fd-1573-4e1a-9ad4-e2030155cbd1',
+    '85991a44-f17b-4d20-85bc-9a56ec86fbd6',
+    'special',
+    'Standalone special lecture for local development'
+  );
+
+INSERT INTO public.lecture_session_enrollments (
+  lecture_session_id,
+  student_id,
+  created_at
+) VALUES
+  ('5bc65875-f317-4efb-b9a9-53612aabf536', 'ce475247-5e94-45d9-9195-d700677237be', CURRENT_TIMESTAMP),
+  ('5bc65875-f317-4efb-b9a9-53612aabf536', '9de7d27b-0f5e-4cc4-a4e0-888333db9a70', CURRENT_TIMESTAMP);
+
+INSERT INTO public.attendances (
+  id,
+  student_id,
+  lecture_id,
+  lecture_session_id,
+  attendance_date,
+  status,
+  created_at,
+  period
+)
+SELECT
+  attendance_seed.id,
+  attendance_seed.student_id,
+  attendance_seed.lecture_id,
+  lecture_session.id,
+  attendance_seed.attendance_date,
+  attendance_seed.status,
+  attendance_seed.created_at,
+  attendance_seed.period
+FROM (
+  VALUES
+    ('53381d07-1401-445f-9acd-e0bcd8dfb1ee'::uuid, '1b212df6-4669-4d50-b835-50dd47ac94cb'::uuid, 'e728bdd7-e6c5-4484-8899-a94ccff997a6'::uuid, '2026-01-05'::date, 'present'::public.attendance_status, '2026-01-05 00:10:00+00'::timestamp with time zone, 1::bigint),
+    ('4060469d-29bd-4772-afb6-920f692d7960'::uuid, '1cde6571-6958-4e1b-9402-402d64a245fa'::uuid, 'e728bdd7-e6c5-4484-8899-a94ccff997a6'::uuid, '2026-01-06'::date, 'absent'::public.attendance_status, '2026-01-06 00:10:00+00'::timestamp with time zone, 3::bigint),
+    ('dd186094-be56-4023-8c17-acc8b2e545f3'::uuid, '664d6972-cdd6-4205-bfd0-2caca1278897'::uuid, '27d90ac4-63f6-4449-97ce-a586ce301ca2'::uuid, '2026-03-03'::date, 'absent'::public.attendance_status, '2026-03-03 00:10:00+00'::timestamp with time zone, 3::bigint),
+    ('d9bbd4eb-84a7-4ad5-b554-c1b4bc9ab2ca'::uuid, '68bf72f4-27f0-4a4f-a0f9-167e4af752dd'::uuid, '27d90ac4-63f6-4449-97ce-a586ce301ca2'::uuid, '2026-03-03'::date, 'absent'::public.attendance_status, '2026-03-03 00:11:00+00'::timestamp with time zone, 3::bigint),
+    ('b850a3c0-7b36-4a72-89e8-0df4aae9b872'::uuid, '0cd16b9e-14d7-4da7-bcab-a699906ccbb0'::uuid, '27d90ac4-63f6-4449-97ce-a586ce301ca2'::uuid, '2026-03-03'::date, 'absent'::public.attendance_status, '2026-03-03 00:12:00+00'::timestamp with time zone, 3::bigint),
+    ('7837177a-560a-4dc0-953d-aa20b773c51a'::uuid, '402eb316-0b6b-48bf-ba0e-a937d23a3d0f'::uuid, '27d90ac4-63f6-4449-97ce-a586ce301ca2'::uuid, '2026-03-03'::date, 'absent'::public.attendance_status, '2026-03-03 00:13:00+00'::timestamp with time zone, 3::bigint),
+    ('7cc5789f-8cd9-41c6-a909-e82c3e0fd75c'::uuid, 'd4889047-93e0-4441-8b15-dd7f370aeeb9'::uuid, '27d90ac4-63f6-4449-97ce-a586ce301ca2'::uuid, '2026-03-03'::date, 'present'::public.attendance_status, '2026-03-03 00:14:00+00'::timestamp with time zone, 3::bigint)
+) AS attendance_seed(id, student_id, lecture_id, attendance_date, status, created_at, period)
+JOIN public.lecture_sessions lecture_session
+  ON lecture_session.lecture_id = attendance_seed.lecture_id
+ AND lecture_session.session_date = attendance_seed.attendance_date
+ AND lecture_session.period = attendance_seed.period;
+
+INSERT INTO public.attendances (
+  id,
+  student_id,
+  lecture_id,
+  lecture_session_id,
+  attendance_date,
+  status,
+  created_at,
+  period
+) VALUES
+  (
+    '313913e8-22e9-4f3e-b207-ab1ec4d0d1b4',
+    'ce475247-5e94-45d9-9195-d700677237be',
+    NULL,
+    '5bc65875-f317-4efb-b9a9-53612aabf536',
+    CURRENT_DATE,
+    'present',
+    CURRENT_TIMESTAMP,
+    4
+  );
 
 SELECT internal.seed_daily_attendances(CURRENT_DATE);
 

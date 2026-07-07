@@ -9,64 +9,89 @@ import {
 
 describe("teacher dashboard helpers", () => {
   describe("buildTodaySchedule", () => {
-    it("returns the day's lectures and fills empty periods", () => {
+    it("returns the day's sessions and fills empty periods", () => {
       expect(
         buildTodaySchedule({
-          lectures: [
+          sessions: [
             {
-              id: "lecture-1",
+              sessionId: "session-1",
+              lectureId: "lecture-1",
               name: "Algebra",
               module: "Math",
-              schedule: [{ day: "Thursday", period: 2 }],
+              period: 2,
+              kind: "regular",
             },
             {
-              id: "lecture-2",
+              sessionId: "session-2",
+              lectureId: null,
               name: "Biology",
               module: null,
-              schedule: [{ day: "Thursday", period: 4 }],
-            },
-            {
-              id: "lecture-3",
-              name: "Ignore me",
-              module: "Other",
-              schedule: [{ day: "Friday", period: 3 }],
+              period: 4,
+              kind: "special",
             },
           ],
-          dayName: "Thursday",
           startPeriod: 1,
           endPeriod: 4,
         }),
       ).toEqual([
         { period: 1, name: "-" },
-        { id: "lecture-1", name: "Algebra", module: "Math", period: 2 },
+        {
+          sessionId: "session-1",
+          lectureId: "lecture-1",
+          name: "Algebra",
+          module: "Math",
+          period: 2,
+          kind: "regular",
+        },
         { period: 3, name: "-" },
-        { id: "lecture-2", name: "Biology", module: undefined, period: 4 },
+        {
+          sessionId: "session-2",
+          lectureId: null,
+          name: "Biology",
+          module: undefined,
+          period: 4,
+          kind: "special",
+        },
       ]);
     });
   });
 
   describe("selectLecture", () => {
     const schedule = [
-      { id: "lecture-1", name: "Algebra", period: 2 },
-      { id: "lecture-2", name: "Biology", period: 3 },
-      { id: "lecture-2", name: "Biology", period: 4 },
+      {
+        sessionId: "session-1",
+        lectureId: "lecture-1",
+        name: "Algebra",
+        period: 2,
+      },
+      {
+        sessionId: "session-2",
+        lectureId: "lecture-2",
+        name: "Biology",
+        period: 3,
+      },
+      {
+        sessionId: "session-3",
+        lectureId: "lecture-2",
+        name: "Biology",
+        period: 4,
+      },
     ];
 
-    it("selects the explicitly chosen period when the same lecture appears consecutively", () => {
+    it("selects the explicitly chosen session", () => {
       expect(
         selectLecture({
           schedule,
-          selectedLectureId: "lecture-2",
-          selectedPeriod: 4,
+          selectedSessionId: "session-3",
         }),
       ).toEqual(schedule[2]);
     });
 
-    it("prefers an explicitly selected lecture id", () => {
+    it("returns the selected session even when the lecture repeats", () => {
       expect(
         selectLecture({
           schedule,
-          selectedLectureId: "lecture-2",
+          selectedSessionId: "session-2",
         }),
       ).toEqual(schedule[1]);
     });

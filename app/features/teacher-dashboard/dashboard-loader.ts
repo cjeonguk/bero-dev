@@ -13,10 +13,7 @@ import {
 import { createClient } from "~/lib/supabase/server";
 import type { Database } from "~/types/database.types";
 import { timetzToMinutes } from "~/utils/dates";
-import {
-  type LectureScheduleEntry,
-  type PeriodScheduleEntry,
-} from "~/utils/schedules";
+import { type PeriodScheduleEntry } from "~/utils/schedules";
 
 type DashboardSupabaseClient = SupabaseClient<Database>;
 
@@ -107,54 +104,49 @@ function getSelectedDateContext(request: Request) {
   };
 }
 
-function resolveCurrentLectureFromLecture({
-  lecture,
+function resolveCurrentLectureFromSession({
+  session,
   selectedDateTime,
-  selectedPeriod,
 }: {
-  lecture:
+  session:
     | {
         id: string;
+        lecture_id: string | null;
         name: string | null;
         module: string | null;
-        schedule: LectureScheduleEntry[] | null;
+        period: number;
+        kind: Database["public"]["Enums"]["lecture_session_kind"];
+        session_date: string;
       }
     | null
     | undefined;
   selectedDateTime: DateTime<true> | DateTime<false>;
-  selectedPeriod?: number;
 }) {
-  if (!lecture?.id) {
-    return undefined;
-  }
-
-  const dayName = selectedDateTime.setLocale("en-US").toFormat("cccc");
-  const matchingPeriod = (lecture.schedule ?? []).find(
-    (entry) =>
-      entry.day === dayName &&
-      (selectedPeriod === undefined || entry.period === selectedPeriod),
-  );
-
-  if (!matchingPeriod) {
+  if (
+    !session?.id ||
+    session.session_date !== selectedDateTime.toFormat("yyyy-MM-dd")
+  ) {
     return undefined;
   }
 
   return {
-    id: lecture.id,
-    name: lecture.name ?? "-",
-    module: lecture.module ?? undefined,
-    period: matchingPeriod.period,
+    sessionId: session.id,
+    lectureId: session.lecture_id,
+    name: session.name ?? "-",
+    module: session.module ?? undefined,
+    period: session.period,
+    kind: session.kind,
   } satisfies DashboardLecture;
 }
 
 export async function loadTeacherDashboardShellData({
   request,
-  lectureId,
+  sessionId,
   supabase,
   userId,
 }: {
   request: Request;
-  lectureId?: string;
+  sessionId?: string;
   supabase?: DashboardSupabaseClient;
   userId?: string;
 }) {
@@ -166,14 +158,8 @@ export async function loadTeacherDashboardShellData({
     supabase: dashboardSupabase,
     userId,
   });
-  const {
-    now,
-    today,
-    selectedDate,
-    selectedDateTime,
-    dateLabel,
-    weekdayLabel,
-  } = getSelectedDateContext(request);
+  const { now, today, selectedDate, dateLabel, weekdayLabel } =
+    getSelectedDateContext(request);
 
   const { data: teacher, error } = await dashboardSupabase
     .from("teachers")
@@ -218,26 +204,26 @@ export async function loadTeacherDashboardShellData({
     throw new Error("semester schedule is incomplete");
   }
 
-  const { data: semesterLectures, error: getLecturesError } =
+  const { data: dailySessions, error: getSessionsError } =
     await dashboardSupabase
-      .from("lectures")
-      .select("schedule, id, name, module")
+      .from("lecture_sessions")
+      .select("id, lecture_id, name, module, period, kind")
       .eq("teacher_id", teacher.id)
-      .eq("semester_id", semester.id);
-  if (getLecturesError) {
-    throw new Error("error in retrieving lectures");
+      .eq("session_date", selectedDate)
+      .order("period", { ascending: true });
+  if (getSessionsError) {
+    throw new Error("error in retrieving lecture sessions");
   }
 
-  const dayName = selectedDateTime.setLocale("en-US").toFormat("cccc");
-  const selectedPeriod = getSelectedPeriodFromRequest(request);
   const schedule = buildTodaySchedule({
-    lectures: (semesterLectures ?? []).map((lecture) => ({
-      id: lecture.id,
-      name: lecture.name,
-      module: lecture.module,
-      schedule: (lecture.schedule ?? []) as LectureScheduleEntry[],
+    sessions: (dailySessions ?? []).map((session) => ({
+      sessionId: session.id,
+      lectureId: session.lecture_id,
+      name: session.name,
+      module: session.module,
+      period: session.period,
+      kind: session.kind,
     })),
-    dayName,
     startPeriod: semester.start_period,
     endPeriod: semester.end_period,
   });
@@ -254,8 +240,7 @@ export async function loadTeacherDashboardShellData({
     nowMinutes >= lastPeriodEndMinutes;
   const currentLecture = selectLecture({
     schedule,
-    selectedLectureId: lectureId,
-    selectedPeriod,
+    selectedSessionId: sessionId,
   });
 
   return {
@@ -266,7 +251,7 @@ export async function loadTeacherDashboardShellData({
     weekdayLabel,
     viewState: resolveDashboardViewState({
       hasSemester: true,
-      hasCurrentLecture: Boolean(currentLecture?.id),
+      hasCurrentLecture: Boolean(currentLecture?.sessionId),
       isDayFinished,
     }),
   } satisfies TeacherDashboardShellLoaderData;
@@ -274,12 +259,12 @@ export async function loadTeacherDashboardShellData({
 
 export async function loadTeacherDashboardLectureDetailData({
   request,
-  lectureId,
+  sessionId,
   supabase,
   userId,
 }: {
   request: Request;
-  lectureId?: string;
+  sessionId?: string;
   supabase?: DashboardSupabaseClient;
   userId?: string;
 }) {
@@ -292,10 +277,8 @@ export async function loadTeacherDashboardLectureDetailData({
     userId,
   });
 
-  const { selectedDate, selectedDateTime } = getSelectedDateContext(request);
-  const selectedPeriod = getSelectedPeriodFromRequest(request);
-
-  if (!lectureId) {
+  const { selectedDateTime } = getSelectedDateContext(request);
+  if (!sessionId) {
     return {
       currentLecture: undefined,
       students: [],
@@ -303,27 +286,24 @@ export async function loadTeacherDashboardLectureDetailData({
     } satisfies TeacherDashboardLectureDetailLoaderData;
   }
 
-  const { data: lecture, error: getLectureError } = await dashboardSupabase
-    .from("lectures")
-    .select("id, name, module, schedule")
-    .eq("id", lectureId)
-    .maybeSingle();
-  if (getLectureError) {
-    throw new Error("error in retrieving lecture");
+  const { data: lectureSession, error: getLectureSessionError } =
+    await dashboardSupabase
+      .from("lecture_sessions")
+      .select(
+        "id, lecture_id, semester_id, name, module, period, kind, session_date",
+      )
+      .eq("id", sessionId)
+      .maybeSingle();
+  if (getLectureSessionError) {
+    throw new Error("error in retrieving lecture session");
   }
 
-  const currentLecture = resolveCurrentLectureFromLecture({
-    lecture: lecture
-      ? {
-          ...lecture,
-          schedule: (lecture.schedule ?? []) as LectureScheduleEntry[],
-        }
-      : lecture,
+  const currentLecture = resolveCurrentLectureFromSession({
+    session: lectureSession,
     selectedDateTime,
-    selectedPeriod,
   });
 
-  if (!currentLecture?.id) {
+  if (!currentLecture?.sessionId || !lectureSession) {
     return {
       currentLecture: undefined,
       students: [],
@@ -331,24 +311,36 @@ export async function loadTeacherDashboardLectureDetailData({
     } satisfies TeacherDashboardLectureDetailLoaderData;
   }
 
+  const enrollmentQuery = lectureSession.lecture_id
+    ? dashboardSupabase
+        .from("enrollments")
+        .select(
+          `
+        student:student_id (
+        id,
+        name,
+        num
+        )`,
+        )
+        .eq("lecture_id", lectureSession.lecture_id)
+    : dashboardSupabase
+        .from("lecture_session_enrollments")
+        .select(
+          `
+        student:student_id (
+        id,
+        name,
+        num
+        )`,
+        )
+        .eq("lecture_session_id", lectureSession.id);
+
   const [enrollmentsResult, attendancesResult] = await Promise.all([
-    dashboardSupabase
-      .from("enrollments")
-      .select(
-        `
-      student:student_id (
-      id,
-      name,
-      num
-      )`,
-      )
-      .eq("lecture_id", currentLecture.id),
+    enrollmentQuery,
     dashboardSupabase
       .from("attendances")
       .select("student_id, status")
-      .eq("lecture_id", currentLecture.id)
-      .eq("attendance_date", selectedDate)
-      .eq("period", currentLecture.period),
+      .eq("lecture_session_id", lectureSession.id),
   ]);
 
   const { data: enrollments, error: getEnrollmentsError } = enrollmentsResult;
@@ -379,10 +371,10 @@ export async function loadTeacherDashboardLectureDetailData({
 
 export async function loadTeacherDashboardShell({
   request,
-  lectureId,
+  sessionId,
 }: {
   request: Request;
-  lectureId?: string;
+  sessionId?: string;
 }) {
   const { supabase, headers } = createClient(request);
   const {
@@ -395,7 +387,7 @@ export async function loadTeacherDashboardShell({
   return data(
     await loadTeacherDashboardShellData({
       request,
-      lectureId,
+      sessionId,
       supabase,
       userId: user.id,
     }),
@@ -405,10 +397,10 @@ export async function loadTeacherDashboardShell({
 
 export async function loadTeacherDashboardLectureDetail({
   request,
-  lectureId,
+  sessionId,
 }: {
   request: Request;
-  lectureId?: string;
+  sessionId?: string;
 }) {
   const { supabase, headers } = createClient(request);
   const {
@@ -421,7 +413,7 @@ export async function loadTeacherDashboardLectureDetail({
   return data(
     await loadTeacherDashboardLectureDetailData({
       request,
-      lectureId,
+      sessionId,
       supabase,
       userId: user.id,
     }),

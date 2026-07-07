@@ -12,11 +12,6 @@ interface Body {
   classroom: string;
 }
 
-interface Schedules {
-  day: string;
-  period: number;
-}
-
 function getDeviceApiToken(request: Request) {
   const authorization = request.headers.get("Authorization");
 
@@ -59,6 +54,7 @@ export async function action({ request }: Route.ActionArgs) {
         name,
         id,
         school:school_id (
+          id,
           semester:current_semester_id (
             id,
             period_schedules
@@ -75,7 +71,8 @@ export async function action({ request }: Route.ActionArgs) {
       !studentInfo ||
       !studentInfo.name ||
       !studentInfo.id ||
-      !studentInfo.school
+      !studentInfo.school ||
+      !studentInfo.school.semester
     )
       return { success: false, studentName: "" };
 
@@ -92,75 +89,82 @@ export async function action({ request }: Route.ActionArgs) {
       return { success: false, studentName: studentInfo.name };
     }
 
-    const dayName = now.toFormat("cccc");
-
-    const { data: classList, error: enrollmentError } = await supabase
-      .from("enrollments")
-      .select(
-        `
-        lecture:lecture_id (
-          id,
-          classroom_id,
-          schedule
-        )
-      `,
-      )
-      .match({
+    const [
+      { data: enrollments, error: enrollmentError },
+      { data: specialSessionEnrollments, error: sessionEnrollmentError },
+    ] = await Promise.all([
+      supabase.from("enrollments").select("lecture_id").match({
         student_id: studentInfo.id,
         semester_id: studentInfo.school.semester.id,
-      });
+      }),
+      supabase
+        .from("lecture_session_enrollments")
+        .select("lecture_session_id")
+        .eq("student_id", studentInfo.id),
+    ]);
 
     if (enrollmentError) throw enrollmentError;
+    if (sessionEnrollmentError) throw sessionEnrollmentError;
 
-    const classInfo = classList.find((element) => {
-      const schedules = element.lecture.schedule as unknown as Schedules[];
+    const enrolledLectureIds = (enrollments ?? [])
+      .map((enrollment) => enrollment.lecture_id)
+      .filter((lectureId): lectureId is string => Boolean(lectureId));
+    const enrolledSessionIds = (specialSessionEnrollments ?? [])
+      .map((enrollment) => enrollment.lecture_session_id)
+      .filter((sessionId): sessionId is string => Boolean(sessionId));
 
-      return schedules.some(
-        (schedule) =>
-          schedule?.day === dayName && schedule.period === currentPeriod,
-      );
+    const { data: currentSessions, error: currentSessionsError } =
+      await supabase
+        .from("lecture_sessions")
+        .select("id, lecture_id, classroom_id, classroom:classroom_id(name)")
+        .eq("school_id", studentInfo.school.id)
+        .eq("session_date", todayStr)
+        .eq("period", currentPeriod);
+
+    if (currentSessionsError) throw currentSessionsError;
+
+    const currentSession = (currentSessions ?? []).find((session) => {
+      const isEligible =
+        enrolledSessionIds.includes(session.id) ||
+        (session.lecture_id
+          ? enrolledLectureIds.includes(session.lecture_id)
+          : false);
+
+      if (!isEligible) {
+        return false;
+      }
+
+      return session.classroom?.name === body.classroom;
     });
 
-    if (!classInfo?.lecture.id || !classInfo.lecture.classroom_id) {
+    if (!currentSession?.id || !currentSession.classroom_id) {
       return { success: false, studentName: studentInfo.name };
     }
 
-    const { data: classroomID, error: classroomError } = await supabase
-      .from("classrooms")
-      .select("name")
-      .eq("id", classInfo.lecture.classroom_id)
-      .single();
+    const { error: updateError } = await supabase
+      .from("students")
+      .update({ last_detected_place: currentSession.classroom_id })
+      .match({ id: studentInfo.id });
 
-    if (classroomError) throw classroomError;
+    if (updateError) throw updateError;
 
-    if (!classroomID || !classroomID.name)
-      return { success: false, studentName: studentInfo.name };
+    const { error: attendanceError } = await supabase
+      .from("attendances")
+      .upsert(
+        {
+          student_id: studentInfo.id,
+          lecture_id: currentSession.lecture_id,
+          lecture_session_id: currentSession.id,
+          attendance_date: todayStr,
+          period: currentPeriod,
+          status: "present",
+        },
+        {
+          onConflict: "student_id,lecture_session_id",
+        },
+      );
 
-    if (classroomID.name === body.classroom) {
-      const { error: updateError } = await supabase
-        .from("students")
-        .update({ last_detected_place: classInfo.lecture.classroom_id })
-        .match({ id: studentInfo.id });
-
-      if (updateError) throw updateError;
-
-      const { error: attendanceError } = await supabase
-        .from("attendances")
-        .upsert(
-          {
-            student_id: studentInfo.id,
-            lecture_id: classInfo.lecture.id,
-            attendance_date: todayStr,
-            period: currentPeriod,
-            status: "present",
-          },
-          {
-            onConflict: "student_id,lecture_id,attendance_date,period",
-          },
-        );
-
-      if (attendanceError) throw attendanceError;
-    }
+    if (attendanceError) throw attendanceError;
 
     return { success: true, studentName: studentInfo.name };
   } catch (error) {

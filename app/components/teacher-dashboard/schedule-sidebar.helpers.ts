@@ -1,34 +1,26 @@
 import { DateTime } from "luxon";
 
-export function getLectureSelectionHref(
-  lectureId: string,
-  period: number,
-  date: string,
-) {
-  return `/teacher/dashboard/${lectureId}?date=${date}&period=${period}`;
+export function getSessionSelectionHref(sessionId: string, date: string) {
+  return `/teacher/dashboard/${sessionId}?date=${date}`;
 }
 
-export function isLectureSelectionActive({
+export function isSessionSelectionActive({
   currentPathname,
   currentSearch,
-  lectureId,
-  period,
+  sessionId,
   selectedDate,
 }: {
   currentPathname: string;
   currentSearch: string;
-  lectureId: string;
-  period: number;
+  sessionId: string;
   selectedDate: string;
 }) {
   const searchParams = new URLSearchParams(currentSearch);
-  const currentPeriod = Number(searchParams.get("period"));
   const currentDate = searchParams.get("date");
 
   return (
-    currentPathname === `/teacher/dashboard/${lectureId}` &&
-    currentDate === selectedDate &&
-    currentPeriod === period
+    currentPathname === `/teacher/dashboard/${sessionId}` &&
+    currentDate === selectedDate
   );
 }
 

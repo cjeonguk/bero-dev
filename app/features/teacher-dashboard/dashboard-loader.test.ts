@@ -15,7 +15,7 @@ vi.mock("~/lib/supabase/server", () => ({
 const mockedCreateClient = vi.mocked(createClient);
 
 function createRequest(
-  url = "https://example.com/teacher/dashboard/lecture-2?date=2026-07-03&period=4",
+  url = "https://example.com/teacher/dashboard/session-2?date=2026-07-03&period=4",
 ) {
   return new Request(url);
 }
@@ -87,21 +87,25 @@ function setupShellClient() {
         };
       }
 
-      if (table === "lectures") {
+      if (table === "lecture_sessions") {
         return {
           select: vi.fn(() => ({
             eq: vi.fn(() => ({
-              eq: vi.fn().mockResolvedValue({
-                data: [
-                  {
-                    id: "lecture-2",
-                    name: "Biology",
-                    module: "Science",
-                    schedule: [{ day: "Friday", period: 4 }],
-                  },
-                ],
-                error: null,
-              }),
+              eq: vi.fn(() => ({
+                order: vi.fn().mockResolvedValue({
+                  data: [
+                    {
+                      id: "session-2",
+                      lecture_id: "lecture-2",
+                      name: "Biology",
+                      module: "Science",
+                      period: 4,
+                      kind: "regular",
+                    },
+                  ],
+                  error: null,
+                }),
+              })),
             })),
           })),
         };
@@ -125,16 +129,20 @@ function setupDetailClient() {
   const supabase = {
     ...authClient,
     from: vi.fn((table: string) => {
-      if (table === "lectures") {
+      if (table === "lecture_sessions") {
         return {
           select: vi.fn(() => ({
             eq: vi.fn(() => ({
               maybeSingle: vi.fn().mockResolvedValue({
                 data: {
-                  id: "lecture-2",
+                  id: "session-2",
+                  lecture_id: "lecture-2",
+                  semester_id: 1,
                   name: "Biology",
                   module: "Science",
-                  schedule: [{ day: "Friday", period: 4 }],
+                  period: 4,
+                  kind: "regular",
+                  session_date: "2026-07-03",
                 },
                 error: null,
               }),
@@ -160,14 +168,70 @@ function setupDetailClient() {
       if (table === "attendances") {
         return {
           select: vi.fn(() => ({
+            eq: vi.fn().mockResolvedValue({
+              data: [{ student_id: "student-2", status: "present" }],
+              error: null,
+            }),
+          })),
+        };
+      }
+
+      throw new Error(`unexpected table ${table}`);
+    }),
+  };
+
+  mockedCreateClient.mockReturnValue({
+    supabase: supabase as never,
+    headers: new Headers(),
+  });
+}
+
+function setupSpecialDetailClient() {
+  const authClient = createAuthClient();
+
+  const supabase = {
+    ...authClient,
+    from: vi.fn((table: string) => {
+      if (table === "lecture_sessions") {
+        return {
+          select: vi.fn(() => ({
             eq: vi.fn(() => ({
-              eq: vi.fn(() => ({
-                eq: vi.fn().mockResolvedValue({
-                  data: [{ student_id: "student-2", status: "present" }],
-                  error: null,
-                }),
-              })),
+              maybeSingle: vi.fn().mockResolvedValue({
+                data: {
+                  id: "session-special",
+                  lecture_id: null,
+                  semester_id: null,
+                  name: "Guest Talk",
+                  module: null,
+                  period: 2,
+                  kind: "special",
+                  session_date: "2026-07-03",
+                },
+                error: null,
+              }),
             })),
+          })),
+        };
+      }
+
+      if (table === "lecture_session_enrollments") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn().mockResolvedValue({
+              data: [{ student: { id: "student-3", name: "Park", num: "3" } }],
+              error: null,
+            }),
+          })),
+        };
+      }
+
+      if (table === "attendances") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn().mockResolvedValue({
+              data: [],
+              error: null,
+            }),
           })),
         };
       }
@@ -213,14 +277,15 @@ describe("teacher dashboard loader helpers", () => {
     await expect(
       loadTeacherDashboardShellData({
         request: createRequest(),
-        lectureId: "lecture-2",
+        sessionId: "session-2",
       }),
     ).resolves.toMatchObject({
       selectedDate: "2026-07-03",
       dateLabel: "2026/07/03",
       weekdayLabel: "금",
       currentLecture: {
-        id: "lecture-2",
+        sessionId: "session-2",
+        lectureId: "lecture-2",
         period: 4,
       },
       viewState: "active-lecture",
@@ -228,13 +293,20 @@ describe("teacher dashboard loader helpers", () => {
         { period: 1, name: "-" },
         { period: 2, name: "-" },
         { period: 3, name: "-" },
-        { id: "lecture-2", name: "Biology", module: "Science", period: 4 },
+        {
+          sessionId: "session-2",
+          lectureId: "lecture-2",
+          name: "Biology",
+          module: "Science",
+          period: 4,
+          kind: "regular",
+        },
       ],
     });
 
     expect(supabase.from).toHaveBeenCalledWith("teachers");
     expect(supabase.from).toHaveBeenCalledWith("semester_schedules");
-    expect(supabase.from).toHaveBeenCalledWith("lectures");
+    expect(supabase.from).toHaveBeenCalledWith("lecture_sessions");
     expect(supabase.from).not.toHaveBeenCalledWith("enrollments");
     expect(supabase.from).not.toHaveBeenCalledWith("attendances");
   });
@@ -245,11 +317,12 @@ describe("teacher dashboard loader helpers", () => {
     await expect(
       loadTeacherDashboardLectureDetailData({
         request: createRequest(),
-        lectureId: "lecture-2",
+        sessionId: "session-2",
       }),
     ).resolves.toMatchObject({
       currentLecture: {
-        id: "lecture-2",
+        sessionId: "session-2",
+        lectureId: "lecture-2",
         name: "Biology",
         module: "Science",
         period: 4,
@@ -257,6 +330,31 @@ describe("teacher dashboard loader helpers", () => {
       students: [
         { id: "student-1", name: "Kim", num: "1", attendance: "absent" },
         { id: "student-2", name: "Lee", num: "2", attendance: "present" },
+      ],
+      viewState: "active-lecture",
+    });
+  });
+
+  it("loads a standalone special session from session enrollments", async () => {
+    setupSpecialDetailClient();
+
+    await expect(
+      loadTeacherDashboardLectureDetailData({
+        request: createRequest(
+          "https://example.com/teacher/dashboard/session-special?date=2026-07-03",
+        ),
+        sessionId: "session-special",
+      }),
+    ).resolves.toMatchObject({
+      currentLecture: {
+        sessionId: "session-special",
+        lectureId: null,
+        name: "Guest Talk",
+        period: 2,
+        kind: "special",
+      },
+      students: [
+        { id: "student-3", name: "Park", num: "3", attendance: "absent" },
       ],
       viewState: "active-lecture",
     });

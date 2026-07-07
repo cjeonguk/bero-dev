@@ -1,11 +1,12 @@
 import type { Database } from "~/types/database.types";
-import type { LectureScheduleEntry } from "~/utils/schedules";
 
 export type DashboardLecture = {
-  id?: string;
+  sessionId?: string;
+  lectureId?: string | null;
   name: string;
   module?: string;
   period: number;
+  kind?: Database["public"]["Enums"]["lecture_session_kind"];
 };
 
 export type DashboardStudent = {
@@ -24,37 +25,35 @@ export type DashboardViewState =
   | "no-semester"
   | "no-selection";
 
-type SchedulableLecture = {
-  id: string;
+type SchedulableSession = {
+  sessionId: string;
+  lectureId: string | null;
   name: string | null;
   module: string | null;
-  schedule: LectureScheduleEntry[] | null;
+  period: number;
+  kind: Database["public"]["Enums"]["lecture_session_kind"];
 };
 
 export function buildTodaySchedule({
-  lectures,
-  dayName,
+  sessions,
   startPeriod,
   endPeriod,
 }: {
-  lectures: SchedulableLecture[];
-  dayName: string;
+  sessions: SchedulableSession[];
   startPeriod: number;
   endPeriod: number;
 }) {
   const schedule: DashboardLecture[] = [];
 
-  for (const lecture of lectures) {
-    for (const dayPeriod of lecture.schedule ?? []) {
-      if (dayPeriod.day !== dayName) continue;
-
-      schedule.push({
-        id: lecture.id,
-        name: lecture.name ?? "-",
-        module: lecture.module ?? undefined,
-        period: dayPeriod.period,
-      });
-    }
+  for (const session of sessions) {
+    schedule.push({
+      sessionId: session.sessionId,
+      lectureId: session.lectureId,
+      name: session.name ?? "-",
+      module: session.module ?? undefined,
+      period: session.period,
+      kind: session.kind,
+    });
   }
 
   for (let period = startPeriod; period <= endPeriod; period++) {
@@ -68,22 +67,16 @@ export function buildTodaySchedule({
 
 export function selectLecture({
   schedule,
-  selectedLectureId,
-  selectedPeriod,
+  selectedSessionId,
 }: {
   schedule: DashboardLecture[];
-  selectedLectureId?: string;
-  selectedPeriod?: number;
+  selectedSessionId?: string;
 }) {
-  if (!selectedLectureId) {
+  if (!selectedSessionId) {
     return undefined;
   }
 
-  return schedule.find(
-    (lecture) =>
-      lecture.id === selectedLectureId &&
-      (selectedPeriod === undefined || lecture.period === selectedPeriod),
-  );
+  return schedule.find((lecture) => lecture.sessionId === selectedSessionId);
 }
 
 export function mergeStudentsWithAttendances({

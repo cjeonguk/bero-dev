@@ -4,8 +4,8 @@ import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader } from "~/components/ui/card";
 import {
   getDateNavigationHref,
-  getLectureSelectionHref,
-  isLectureSelectionActive,
+  getSessionSelectionHref,
+  isSessionSelectionActive,
 } from "./schedule-sidebar.helpers";
 
 export function ScheduleSidebar({
@@ -53,18 +53,17 @@ export function ScheduleSidebar({
       <CardContent className="pt-4">
         <div className="flex flex-col gap-2">
           {schedule.map((period) => {
-            const lectureId = period.id;
-            const isActive = lectureId
-              ? isLectureSelectionActive({
+            const sessionId = period.sessionId;
+            const isActive = sessionId
+              ? isSessionSelectionActive({
                   currentPathname: location.pathname,
                   currentSearch: location.search,
-                  lectureId,
-                  period: period.period,
+                  sessionId,
                   selectedDate,
                 })
               : false;
 
-            if (!lectureId) {
+            if (!sessionId) {
               return (
                 <div
                   key={`period-${period.period}`}
@@ -79,18 +78,12 @@ export function ScheduleSidebar({
 
             return (
               <Button
-                key={`${lectureId}-${period.period}`}
+                key={sessionId}
                 asChild
                 variant={isActive ? "secondary" : "ghost"}
                 className="h-10 justify-between"
               >
-                <Link
-                  to={getLectureSelectionHref(
-                    lectureId,
-                    period.period,
-                    selectedDate,
-                  )}
-                >
+                <Link to={getSessionSelectionHref(sessionId, selectedDate)}>
                   <span className="truncate text-sm font-medium [font-variant-numeric:tabular-nums]">
                     {period.period}교시 {period.name}
                   </span>

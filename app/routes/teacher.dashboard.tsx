@@ -41,7 +41,7 @@ export function shouldRevalidateTeacherDashboardShell({
 }
 
 export async function loader({ request, params }: Route.LoaderArgs) {
-  return loadTeacherDashboardShell({ request, lectureId: params.lectureId });
+  return loadTeacherDashboardShell({ request, sessionId: params.sessionId });
 }
 
 export function shouldRevalidate(args: ShouldRevalidateFunctionArgs) {

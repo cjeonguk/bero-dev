@@ -45,6 +45,7 @@ export type Database = {
           created_at: string;
           id: string;
           lecture_id: string | null;
+          lecture_session_id: string | null;
           period: number | null;
           status: Database["public"]["Enums"]["attendance_status"] | null;
           student_id: string | null;
@@ -54,6 +55,7 @@ export type Database = {
           created_at?: string;
           id?: string;
           lecture_id?: string | null;
+          lecture_session_id?: string | null;
           period?: number | null;
           status?: Database["public"]["Enums"]["attendance_status"] | null;
           student_id?: string | null;
@@ -63,6 +65,7 @@ export type Database = {
           created_at?: string;
           id?: string;
           lecture_id?: string | null;
+          lecture_session_id?: string | null;
           period?: number | null;
           status?: Database["public"]["Enums"]["attendance_status"] | null;
           student_id?: string | null;
@@ -74,6 +77,13 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "enrollments";
             referencedColumns: ["student_id", "lecture_id"];
+          },
+          {
+            foreignKeyName: "attendances_lecture_session_id_fkey";
+            columns: ["lecture_session_id"];
+            isOneToOne: false;
+            referencedRelation: "lecture_sessions";
+            referencedColumns: ["id"];
           },
         ];
       };
@@ -200,6 +210,123 @@ export type Database = {
           },
           {
             foreignKeyName: "lecturess_teacher_id_fkey";
+            columns: ["teacher_id"];
+            isOneToOne: false;
+            referencedRelation: "teachers";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      lecture_session_enrollments: {
+        Row: {
+          created_at: string;
+          lecture_session_id: string;
+          student_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          lecture_session_id: string;
+          student_id: string;
+        };
+        Update: {
+          created_at?: string;
+          lecture_session_id?: string;
+          student_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "lecture_session_enrollments_lecture_session_id_fkey";
+            columns: ["lecture_session_id"];
+            isOneToOne: false;
+            referencedRelation: "lecture_sessions";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "lecture_session_enrollments_student_id_fkey";
+            columns: ["student_id"];
+            isOneToOne: false;
+            referencedRelation: "students";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      lecture_sessions: {
+        Row: {
+          classroom_id: string;
+          created_at: string;
+          id: string;
+          kind: Database["public"]["Enums"]["lecture_session_kind"];
+          lecture_id: string | null;
+          module: string | null;
+          name: string | null;
+          note: string | null;
+          period: number;
+          school_id: string;
+          semester_id: number | null;
+          session_date: string;
+          teacher_id: string;
+        };
+        Insert: {
+          classroom_id: string;
+          created_at?: string;
+          id?: string;
+          kind?: Database["public"]["Enums"]["lecture_session_kind"];
+          lecture_id?: string | null;
+          module?: string | null;
+          name?: string | null;
+          note?: string | null;
+          period: number;
+          school_id: string;
+          semester_id?: number | null;
+          session_date: string;
+          teacher_id: string;
+        };
+        Update: {
+          classroom_id?: string;
+          created_at?: string;
+          id?: string;
+          kind?: Database["public"]["Enums"]["lecture_session_kind"];
+          lecture_id?: string | null;
+          module?: string | null;
+          name?: string | null;
+          note?: string | null;
+          period?: number;
+          school_id?: string;
+          semester_id?: number | null;
+          session_date?: string;
+          teacher_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "lecture_sessions_classroom_id_fkey";
+            columns: ["classroom_id"];
+            isOneToOne: false;
+            referencedRelation: "classrooms";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "lecture_sessions_lecture_id_fkey";
+            columns: ["lecture_id"];
+            isOneToOne: false;
+            referencedRelation: "lectures";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "lecture_sessions_school_id_fkey";
+            columns: ["school_id"];
+            isOneToOne: false;
+            referencedRelation: "schools";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "lecture_sessions_semester_id_fkey";
+            columns: ["semester_id"];
+            isOneToOne: false;
+            referencedRelation: "semester_schedules";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "lecture_sessions_teacher_id_fkey";
             columns: ["teacher_id"];
             isOneToOne: false;
             referencedRelation: "teachers";
@@ -371,6 +498,7 @@ export type Database = {
         | "late"
         | "excused"
         | "sick leave";
+      lecture_session_kind: "regular" | "makeup" | "special";
     };
     CompositeTypes: {
       [_ in never]: never;
@@ -505,6 +633,7 @@ export const Constants = {
   public: {
     Enums: {
       attendance_status: ["present", "absent", "late", "excused", "sick leave"],
+      lecture_session_kind: ["regular", "makeup", "special"],
     },
   },
 } as const;

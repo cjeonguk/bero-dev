@@ -9,12 +9,22 @@ describe("teacher dashboard index route", () => {
       getTeacherDashboardIndexRedirectHref(
         [
           { period: 1, name: "-" },
-          { id: "lecture-2", name: "Biology", period: 4 },
-          { id: "lecture-3", name: "Math", period: 5 },
+          {
+            sessionId: "session-2",
+            lectureId: "lecture-2",
+            name: "Biology",
+            period: 4,
+          },
+          {
+            sessionId: "session-3",
+            lectureId: "lecture-3",
+            name: "Math",
+            period: 5,
+          },
         ],
         "2026-07-03",
       ),
-    ).toBe("/teacher/dashboard/lecture-2?date=2026-07-03&period=4");
+    ).toBe("/teacher/dashboard/session-2?date=2026-07-03");
   });
 
   it("does not build a redirect href when there is no scheduled lecture", () => {
@@ -33,10 +43,10 @@ describe("teacher dashboard index route", () => {
     expect(
       shouldRevalidateTeacherDashboardShell({
         currentUrl: new URL(
-          "https://example.com/teacher/dashboard/lecture-1?date=2026-07-03&period=3",
+          "https://example.com/teacher/dashboard/session-1?date=2026-07-03",
         ),
         nextUrl: new URL(
-          "https://example.com/teacher/dashboard/lecture-2?date=2026-07-03&period=4",
+          "https://example.com/teacher/dashboard/session-2?date=2026-07-03",
         ),
         formMethod: undefined,
         actionResult: undefined,
@@ -49,10 +59,10 @@ describe("teacher dashboard index route", () => {
     expect(
       shouldRevalidateTeacherDashboardShell({
         currentUrl: new URL(
-          "https://example.com/teacher/dashboard/lecture-1?date=2026-07-03&period=3",
+          "https://example.com/teacher/dashboard/session-1?date=2026-07-03",
         ),
         nextUrl: new URL(
-          "https://example.com/teacher/dashboard/lecture-2?date=2026-07-04&period=4",
+          "https://example.com/teacher/dashboard/session-2?date=2026-07-04",
         ),
         formMethod: undefined,
         actionResult: undefined,
