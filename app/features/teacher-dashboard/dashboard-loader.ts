@@ -384,7 +384,6 @@ export async function loadTeacherDashboardShell({
   request: Request;
   lectureId?: string;
 }) {
-  const startedAt = Date.now();
   const { supabase, headers } = createClient(request);
   const {
     data: { user },
@@ -393,23 +392,15 @@ export async function loadTeacherDashboardShell({
     return redirect("/login", { headers });
   }
 
-  try {
-    return data(
-      await loadTeacherDashboardShellData({
-        request,
-        lectureId,
-        supabase,
-        userId: user.id,
-      }),
-      { headers },
-    );
-  } finally {
-    console.info("[dashboard:shell]", {
-      lectureId: lectureId ?? null,
-      date: getSelectedDateFromRequest(request) ?? null,
-      durationMs: Date.now() - startedAt,
-    });
-  }
+  return data(
+    await loadTeacherDashboardShellData({
+      request,
+      lectureId,
+      supabase,
+      userId: user.id,
+    }),
+    { headers },
+  );
 }
 
 export async function loadTeacherDashboardLectureDetail({
@@ -419,7 +410,6 @@ export async function loadTeacherDashboardLectureDetail({
   request: Request;
   lectureId?: string;
 }) {
-  const startedAt = Date.now();
   const { supabase, headers } = createClient(request);
   const {
     data: { user },
@@ -428,22 +418,13 @@ export async function loadTeacherDashboardLectureDetail({
     return redirect("/login", { headers });
   }
 
-  try {
-    return data(
-      await loadTeacherDashboardLectureDetailData({
-        request,
-        lectureId,
-        supabase,
-        userId: user.id,
-      }),
-      { headers },
-    );
-  } finally {
-    console.info("[dashboard:detail]", {
-      lectureId: lectureId ?? null,
-      date: getSelectedDateFromRequest(request) ?? null,
-      period: getSelectedPeriodFromRequest(request) ?? null,
-      durationMs: Date.now() - startedAt,
-    });
-  }
+  return data(
+    await loadTeacherDashboardLectureDetailData({
+      request,
+      lectureId,
+      supabase,
+      userId: user.id,
+    }),
+    { headers },
+  );
 }
