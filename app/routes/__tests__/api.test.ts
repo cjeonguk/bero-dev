@@ -178,10 +178,7 @@ describe("api route action", () => {
     expect(upsertAttendance).toHaveBeenCalledWith(
       {
         student_id: "student-1",
-        lecture_id: "lecture-1",
         lecture_session_id: "session-1",
-        attendance_date: "2026-06-19",
-        period: 2,
         status: "present",
       },
       {
@@ -229,10 +226,7 @@ describe("api route action", () => {
     expect(upsertAttendance).toHaveBeenCalledWith(
       {
         student_id: "student-1",
-        lecture_id: "lecture-1",
         lecture_session_id: "session-4",
-        attendance_date: "2026-06-19",
-        period: 4,
         status: "present",
       },
       {
@@ -264,10 +258,7 @@ describe("api route action", () => {
     expect(upsertAttendance).toHaveBeenCalledWith(
       {
         student_id: "student-1",
-        lecture_id: null,
         lecture_session_id: "session-special",
-        attendance_date: "2026-06-19",
-        period: 2,
         status: "present",
       },
       {

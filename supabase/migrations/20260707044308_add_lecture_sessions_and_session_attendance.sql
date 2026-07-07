@@ -18,7 +18,6 @@ create table public.lecture_sessions (
   teacher_id uuid not null references public.teachers(id),
   kind public.lecture_session_kind not null default 'regular',
   note text,
-  unique (lecture_id, session_date, period),
   unique (classroom_id, session_date, period),
   unique (teacher_id, session_date, period)
 );
@@ -33,9 +32,9 @@ create table public.lecture_session_enrollments (
 alter table public.attendances
 add column lecture_session_id uuid references public.lecture_sessions(id) on delete cascade;
 
-alter table public.attendances
-add constraint attendances_student_lecture_session_key
-unique (student_id, lecture_session_id);
+create unique index lecture_sessions_lecture_slot_idx
+on public.lecture_sessions (lecture_id, session_date, period)
+where lecture_id is not null;
 
 create index lecture_sessions_teacher_id_session_date_idx
 on public.lecture_sessions (teacher_id, session_date);
@@ -107,40 +106,15 @@ to authenticated
 using (
   exists (
     select 1
-    from public.teachers teacher
-    where teacher.id = (select auth.uid())
+    from public.lecture_sessions lecture_session
+    join public.teachers teacher
+      on teacher.id = (select auth.uid())
+    where lecture_session.id = attendances.lecture_session_id
       and (
-        (
-          attendances.lecture_session_id is not null
-          and exists (
-            select 1
-            from public.lecture_sessions lecture_session
-            where lecture_session.id = attendances.lecture_session_id
-              and (
-                lecture_session.teacher_id = teacher.id
-                or (
-                  coalesce(teacher.is_admin, false)
-                  and lecture_session.school_id = teacher.school_id
-                )
-              )
-          )
-        )
+        lecture_session.teacher_id = teacher.id
         or (
-          attendances.lecture_session_id is null
-          and exists (
-            select 1
-            from public.lectures lecture
-            left join public.semester_schedules semester
-              on semester.id = lecture.semester_id
-            where lecture.id = attendances.lecture_id
-              and (
-                lecture.teacher_id = teacher.id
-                or (
-                  coalesce(teacher.is_admin, false)
-                  and semester.school_id = teacher.school_id
-                )
-              )
-          )
+          coalesce(teacher.is_admin, false)
+          and lecture_session.school_id = teacher.school_id
         )
       )
   )
@@ -278,6 +252,36 @@ where lecture_session.lecture_id = attendance.lecture_id
   and lecture_session.period = attendance.period
   and attendance.lecture_session_id is null;
 
+do $$
+begin
+  if exists (
+    select 1
+    from public.attendances
+    where lecture_session_id is null
+  ) then
+    raise exception 'attendances rows remain without lecture_session_id after backfill';
+  end if;
+end;
+$$;
+
+alter table public.attendances
+drop constraint if exists fk_enrollments;
+
+alter table public.attendances
+drop constraint if exists attendances_student_lecture_date_period_key;
+
+alter table public.attendances
+alter column lecture_session_id set not null;
+
+alter table public.attendances
+add constraint attendances_student_lecture_session_key
+unique (student_id, lecture_session_id);
+
+alter table public.attendances
+drop column lecture_id,
+drop column attendance_date,
+drop column period;
+
 create or replace function internal.seed_daily_attendances(
   target_date date default ((now() at time zone 'Asia/Seoul')::date)
 )
@@ -320,19 +324,13 @@ begin
   ), inserted_rows as (
     insert into public.attendances (
       student_id,
-      lecture_id,
       lecture_session_id,
-      attendance_date,
-      status,
-      period
+      status
     )
     select distinct
       session_student.student_id,
-      session_student.lecture_id,
       session_student.lecture_session_id,
-      session_student.session_date,
-      'absent'::public.attendance_status,
-      session_student.period
+      'absent'::public.attendance_status
     from session_students session_student
     on conflict (student_id, lecture_session_id) do nothing
     returning 1

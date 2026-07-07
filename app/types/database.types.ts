@@ -41,43 +41,27 @@ export type Database = {
     Tables: {
       attendances: {
         Row: {
-          attendance_date: string | null;
           created_at: string;
           id: string;
-          lecture_id: string | null;
-          lecture_session_id: string | null;
-          period: number | null;
+          lecture_session_id: string;
           status: Database["public"]["Enums"]["attendance_status"] | null;
           student_id: string | null;
         };
         Insert: {
-          attendance_date?: string | null;
           created_at?: string;
           id?: string;
-          lecture_id?: string | null;
-          lecture_session_id?: string | null;
-          period?: number | null;
+          lecture_session_id: string;
           status?: Database["public"]["Enums"]["attendance_status"] | null;
           student_id?: string | null;
         };
         Update: {
-          attendance_date?: string | null;
           created_at?: string;
           id?: string;
-          lecture_id?: string | null;
-          lecture_session_id?: string | null;
-          period?: number | null;
+          lecture_session_id?: string;
           status?: Database["public"]["Enums"]["attendance_status"] | null;
           student_id?: string | null;
         };
         Relationships: [
-          {
-            foreignKeyName: "fk_enrollments";
-            columns: ["student_id", "lecture_id"];
-            isOneToOne: false;
-            referencedRelation: "enrollments";
-            referencedColumns: ["student_id", "lecture_id"];
-          },
           {
             foreignKeyName: "attendances_lecture_session_id_fkey";
             columns: ["lecture_session_id"];

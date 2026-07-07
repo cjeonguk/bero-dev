@@ -482,22 +482,16 @@ INSERT INTO public.lecture_session_enrollments (
 INSERT INTO public.attendances (
   id,
   student_id,
-  lecture_id,
   lecture_session_id,
-  attendance_date,
   status,
-  created_at,
-  period
+  created_at
 )
 SELECT
   attendance_seed.id,
   attendance_seed.student_id,
-  attendance_seed.lecture_id,
   lecture_session.id,
-  attendance_seed.attendance_date,
   attendance_seed.status,
-  attendance_seed.created_at,
-  attendance_seed.period
+  attendance_seed.created_at
 FROM (
   VALUES
     ('53381d07-1401-445f-9acd-e0bcd8dfb1ee'::uuid, '1b212df6-4669-4d50-b835-50dd47ac94cb'::uuid, 'e728bdd7-e6c5-4484-8899-a94ccff997a6'::uuid, '2026-01-05'::date, 'present'::public.attendance_status, '2026-01-05 00:10:00+00'::timestamp with time zone, 1::bigint),
@@ -516,22 +510,16 @@ JOIN public.lecture_sessions lecture_session
 INSERT INTO public.attendances (
   id,
   student_id,
-  lecture_id,
   lecture_session_id,
-  attendance_date,
   status,
-  created_at,
-  period
+  created_at
 ) VALUES
   (
     '313913e8-22e9-4f3e-b207-ab1ec4d0d1b4',
     'ce475247-5e94-45d9-9195-d700677237be',
-    NULL,
     '5bc65875-f317-4efb-b9a9-53612aabf536',
-    CURRENT_DATE,
     'present',
-    CURRENT_TIMESTAMP,
-    4
+    CURRENT_TIMESTAMP
   );
 
 SELECT internal.seed_daily_attendances(CURRENT_DATE);

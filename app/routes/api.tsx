@@ -153,10 +153,7 @@ export async function action({ request }: Route.ActionArgs) {
       .upsert(
         {
           student_id: studentInfo.id,
-          lecture_id: currentSession.lecture_id,
           lecture_session_id: currentSession.id,
-          attendance_date: todayStr,
-          period: currentPeriod,
           status: "present",
         },
         {
