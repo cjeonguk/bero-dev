@@ -458,6 +458,7 @@ export type Database = {
           name: string | null;
           num: string | null;
           school_id: string | null;
+          status: Database["public"]["Enums"]["student_status"];
         };
         Insert: {
           created_at?: string;
@@ -467,6 +468,7 @@ export type Database = {
           name?: string | null;
           num?: string | null;
           school_id?: string | null;
+          status?: Database["public"]["Enums"]["student_status"];
         };
         Update: {
           created_at?: string;
@@ -476,6 +478,7 @@ export type Database = {
           name?: string | null;
           num?: string | null;
           school_id?: string | null;
+          status?: Database["public"]["Enums"]["student_status"];
         };
         Relationships: [
           {
@@ -501,13 +504,15 @@ export type Database = {
           is_admin: boolean | null;
           name: string | null;
           school_id: string | null;
+          user_id: string | null;
         };
         Insert: {
           created_at?: string;
-          id: string;
+          id?: string;
           is_admin?: boolean | null;
           name?: string | null;
           school_id?: string | null;
+          user_id?: string | null;
         };
         Update: {
           created_at?: string;
@@ -515,6 +520,7 @@ export type Database = {
           is_admin?: boolean | null;
           name?: string | null;
           school_id?: string | null;
+          user_id?: string | null;
         };
         Relationships: [
           {
@@ -541,6 +547,7 @@ export type Database = {
         | "excused"
         | "sick leave";
       lecture_session_kind: "regular" | "makeup" | "special";
+      student_status: "active" | "inactive" | "graduated" | "leave";
     };
     CompositeTypes: {
       [_ in never]: never;
@@ -676,6 +683,7 @@ export const Constants = {
     Enums: {
       attendance_status: ["present", "absent", "late", "excused", "sick leave"],
       lecture_session_kind: ["regular", "makeup", "special"],
+      student_status: ["active", "inactive", "graduated", "leave"],
     },
   },
 } as const;

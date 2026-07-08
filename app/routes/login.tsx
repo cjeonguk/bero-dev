@@ -31,7 +31,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const { data: teacher } = await supabase
     .from("teachers")
     .select("id")
-    .eq("id", user.id)
+    .eq("user_id", user.id)
     .maybeSingle();
 
   return redirect(teacher ? "/teacher/dashboard" : "/", { headers });

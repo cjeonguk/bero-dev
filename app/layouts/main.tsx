@@ -9,13 +9,7 @@ import {
   useNavigation,
   type ShouldRevalidateFunctionArgs,
 } from "react-router";
-import {
-  useEffect,
-  useEffectEvent,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { Button } from "~/components/ui/button";
 import { createClient } from "~/lib/supabase/server";
 import type { Route } from "./+types/main";
@@ -43,7 +37,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   const { data: teacher } = await supabase
     .from("teachers")
     .select("name, is_admin")
-    .eq("id", user.id)
+    .eq("user_id", user.id)
     .maybeSingle();
 
   const emailName = user.email?.split("@")[0] ?? "사용자";
@@ -184,7 +178,15 @@ function HeaderUserMenu({ user }: { user: HeaderUser }) {
           role="menu"
           className="absolute right-0 top-[calc(100%+0.5rem)] z-20 min-w-full overflow-hidden rounded-2xl border border-border bg-popover p-1 text-popover-foreground shadow-lg shadow-foreground/5"
         >
-          <MenuItem icon={<Settings className="size-4" />}>설정</MenuItem>
+          <Link
+            to="/teacher/settings"
+            role="menuitem"
+            onClick={() => setOpen(false)}
+            className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm text-foreground transition-colors hover:bg-muted"
+          >
+            <Settings className="size-4" />
+            <span className="flex-1">설정</span>
+          </Link>
           <Form method="post" action="/logout">
             <button
               type="submit"
@@ -199,25 +201,6 @@ function HeaderUserMenu({ user }: { user: HeaderUser }) {
         </div>
       ) : null}
     </div>
-  );
-}
-
-function MenuItem({
-  icon,
-  children,
-}: {
-  icon: ReactNode;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      disabled
-      className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm text-muted-foreground"
-    >
-      {icon}
-      <span className="flex-1">{children}</span>
-    </button>
   );
 }
 
@@ -261,6 +244,12 @@ function getHeaderState(pathname: string): HeaderState {
   if (pathname.startsWith("/teacher/dashboard")) {
     return {
       label: "출석 현황",
+    };
+  }
+
+  if (pathname.startsWith("/teacher/settings")) {
+    return {
+      label: "선생님 설정",
     };
   }
 

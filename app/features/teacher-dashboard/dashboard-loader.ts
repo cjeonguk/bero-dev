@@ -164,7 +164,7 @@ export async function loadTeacherDashboardShellData({
   const { data: teacher, error } = await dashboardSupabase
     .from("teachers")
     .select("school_id, id")
-    .eq("id", teacherUserId)
+    .eq("user_id", teacherUserId)
     .single();
   if (error) {
     throw new Error("account is not a teacher");

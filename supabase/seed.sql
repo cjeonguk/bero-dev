@@ -276,10 +276,10 @@ INSERT INTO public.semester_schedules (
     ]
   );
 
-INSERT INTO public.teachers (id, created_at, name, school_id, is_admin) VALUES
-  ('e4d7fd60-b39f-4dec-99c0-a847dacc0572', '2026-01-01 09:20:00+00', 'Teacher Alpha', 'd4289665-0d3e-4784-a06b-e97f2d595a5c', false),
-  ('85991a44-f17b-4d20-85bc-9a56ec86fbd6', '2026-02-01 09:20:00+00', 'Teacher Bravo', 'b8ab83ad-39f4-44b7-91c7-f28794adc666', true),
-  ('07993eea-ca5c-4902-b527-fcfeb7e5fdab', '2026-03-01 09:20:00+00', 'Teacher Charlie', 'f52d2304-22cb-4ea0-88f8-a196c6ef02ae', false);
+INSERT INTO public.teachers (id, user_id, created_at, name, school_id, is_admin) VALUES
+  ('e4d7fd60-b39f-4dec-99c0-a847dacc0572', 'e4d7fd60-b39f-4dec-99c0-a847dacc0572', '2026-01-01 09:20:00+00', 'Teacher Alpha', 'd4289665-0d3e-4784-a06b-e97f2d595a5c', false),
+  ('85991a44-f17b-4d20-85bc-9a56ec86fbd6', '85991a44-f17b-4d20-85bc-9a56ec86fbd6', '2026-02-01 09:20:00+00', 'Teacher Bravo', 'b8ab83ad-39f4-44b7-91c7-f28794adc666', true),
+  ('07993eea-ca5c-4902-b527-fcfeb7e5fdab', '07993eea-ca5c-4902-b527-fcfeb7e5fdab', '2026-03-01 09:20:00+00', 'Teacher Charlie', 'f52d2304-22cb-4ea0-88f8-a196c6ef02ae', false);
 
 -- Raw tokens for local development:
 -- fixed-room-a-client => room-a-fixed-token
