@@ -86,6 +86,21 @@ export type TeacherActor = {
   is_admin: boolean | null;
 };
 
+const requiredFieldMessages: Record<string, string> = {
+  intent: "요청 정보를 다시 확인해 주세요.",
+  name: "이름을 입력해 주세요.",
+  classroomId: "교실을 선택해 주세요.",
+  defaultClassroomId: "기본 교실을 선택해 주세요.",
+  lectureId: "수업 정보를 다시 확인해 주세요.",
+  clientId: "클라이언트 정보를 다시 확인해 주세요.",
+  studentId: "학생을 선택해 주세요.",
+  teacherId: "선생님 정보를 다시 확인해 주세요.",
+  status: "상태를 선택해 주세요.",
+  num: "번호를 입력해 주세요.",
+  email: "이메일을 입력해 주세요.",
+  password: "임시 비밀번호를 입력해 주세요.",
+};
+
 export function getTodayInSeoul(now = new Date()) {
   return DateTime.fromJSDate(now, { zone: "Asia/Seoul" }).toFormat(
     "yyyy-MM-dd",
@@ -120,7 +135,9 @@ export function toRequiredString(
 ) {
   const parsed = toOptionalString(value);
   if (!parsed) {
-    throw new Error(`${label} is required`);
+    throw new Error(
+      requiredFieldMessages[label] ?? "필수 항목을 입력해 주세요.",
+    );
   }
 
   return parsed;
