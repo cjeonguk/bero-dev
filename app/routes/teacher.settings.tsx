@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import {
   Form,
   Link,
@@ -7,6 +7,7 @@ import {
   useActionData,
   useNavigation,
   useSearchParams,
+  useSubmit,
 } from "react-router";
 import { Button } from "~/components/ui/button";
 import {
@@ -24,6 +25,14 @@ import {
 } from "~/components/ui/empty";
 import { Label } from "~/components/ui/label";
 import { Separator } from "~/components/ui/separator";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "~/components/ui/dialog";
 import { createServiceRoleClient, createClient } from "~/lib/supabase/server";
 import { handleTeacherSettingsAction } from "~/features/teacher-settings/settings-actions";
 import { loadTeacherSettingsData } from "~/features/teacher-settings/settings-loader";
@@ -31,7 +40,9 @@ import type {
   TeacherSettingsActionResult,
   TeacherSettingsLecture,
 } from "~/features/teacher-settings/settings";
+import { parseAttendanceMarkInput } from "~/features/teacher-settings/settings";
 import type { Route } from "./+types/teacher.settings";
+import { toast } from "sonner";
 
 type SettingsSectionId =
   | "profile"
@@ -49,15 +60,15 @@ type SettingsSection = {
 };
 
 const baseSections: SettingsSection[] = [
-  { id: "profile", label: "본인 계정 정보" },
+  { id: "profile", label: "계정 정보" },
   { id: "lectures", label: "등록된 수업 목록" },
   { id: "clients", label: "클라이언트 등록" },
 ];
 
 const adminSections: SettingsSection[] = [
-  { id: "admin-clients", label: "전체 클라이언트", adminOnly: true },
+  { id: "admin-clients", label: "교실 클라이언트", adminOnly: true },
   { id: "admin-students", label: "학생 관리", adminOnly: true },
-  { id: "admin-teachers", label: "선생 관리", adminOnly: true },
+  { id: "admin-teachers", label: "선생님 관리", adminOnly: true },
   { id: "admin-attendance", label: "공결 / 병결 처리", adminOnly: true },
 ];
 
@@ -119,6 +130,7 @@ export default function TeacherSettings({ loaderData }: Route.ComponentProps) {
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
   const [searchParams] = useSearchParams();
+  const [dismissedToken, setDismissedToken] = useState<string | null>(null);
   const isSubmitting = navigation.state !== "idle";
   const sections = loaderData.admin
     ? [...baseSections, ...adminSections]
@@ -127,21 +139,43 @@ export default function TeacherSettings({ loaderData }: Route.ComponentProps) {
     section: searchParams.get("section"),
     sections,
   });
+  const token =
+    actionData && "token" in actionData ? actionData.token : undefined;
+  const visibleToken = token && token !== dismissedToken ? token : undefined;
+
+  useEffect(() => {
+    if (!actionData) {
+      return;
+    }
+
+    if (actionData.ok) {
+      toast.success(actionData.message);
+    } else {
+      toast.error(actionData.message);
+    }
+  }, [actionData]);
 
   return (
-    <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-6 p-4 lg:grid lg:grid-cols-[260px_minmax(0,1fr)] lg:items-start lg:gap-6 lg:p-6">
-      <SettingsMenu sections={sections} activeSection={activeSection} />
+    <>
+      <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-6 p-4 lg:grid lg:grid-cols-[260px_minmax(0,1fr)] lg:items-start lg:gap-6 lg:p-6">
+        <SettingsMenu sections={sections} activeSection={activeSection} />
 
-      <div className="flex min-w-0 flex-col gap-6">
-        {actionData ? <ActionNotice actionData={actionData} /> : null}
-
-        <SettingsSectionPanel
-          section={activeSection}
-          loaderData={loaderData}
-          isSubmitting={isSubmitting}
-        />
+        <div className="flex min-w-0 flex-col gap-6">
+          <SettingsSectionPanel
+            section={activeSection}
+            loaderData={loaderData}
+            isSubmitting={isSubmitting}
+          />
+        </div>
       </div>
-    </div>
+      <TokenDialog
+        open={Boolean(visibleToken)}
+        token={visibleToken ?? ""}
+        onOpenChange={(open) =>
+          setDismissedToken(open ? null : (visibleToken ?? null))
+        }
+      />
+    </>
   );
 }
 
@@ -296,8 +330,8 @@ function ProfileSection({
 }) {
   return (
     <SectionCard
-      title="본인 계정 정보"
-      description="이메일은 표시만 하고, 이름만 수정할 수 있습니다."
+      title="계정 정보"
+      description="계정 정보를 수정할 수 있습니다."
     >
       <Form method="post" className="flex flex-col gap-4">
         <input type="hidden" name="intent" value="update-profile" />
@@ -483,34 +517,20 @@ function ClientsSection({
   return (
     <SectionCard
       title="클라이언트 등록"
-      description="본인이 등록한 attendance client를 관리합니다."
+      description="등록한 클라이언트를 관리합니다."
     >
       <div className="flex flex-col gap-6">
         <Form
           method="post"
           className="grid gap-4 rounded-xl border border-border/70 p-4 lg:grid-cols-3"
         >
-          <input type="hidden" name="intent" value="create-client" />
+          <input type="hidden" name="intent" value="create-teacher-client" />
           <Field label="클라이언트 이름">
             <input
               name="name"
               className={fieldClassName}
               placeholder="Teacher Laptop"
             />
-          </Field>
-          <Field label="기본 교실">
-            <select
-              name="defaultClassroomId"
-              className={fieldClassName}
-              defaultValue=""
-            >
-              <option value="">선택 안 함</option>
-              {loaderData.classrooms.map((classroom) => (
-                <option key={classroom.id} value={classroom.id}>
-                  {classroom.name}
-                </option>
-              ))}
-            </select>
           </Field>
           <div className="flex items-end">
             <Button type="submit" disabled={isSubmitting}>
@@ -538,31 +558,17 @@ function AdminClientsSection({
 }) {
   return (
     <SectionCard
-      title="학교 관리자 설정 · 전체 클라이언트"
-      description="학교 소속 전체 클라이언트를 등록하고 비활성화합니다."
+      title="학교 관리자 설정 · 교실 클라이언트"
+      description="교실 클라이언트를 등록하고 비활성화합니다."
     >
       <div className="flex flex-col gap-4">
         <Form
           method="post"
           className="grid gap-4 rounded-xl border border-border/70 p-4"
         >
-          <input type="hidden" name="intent" value="create-client" />
+          <input type="hidden" name="intent" value="create-classroom-client" />
           <Field label="클라이언트 이름">
             <input name="name" className={fieldClassName} />
-          </Field>
-          <Field label="담당 선생님">
-            <select
-              name="ownerTeacherId"
-              className={fieldClassName}
-              defaultValue=""
-            >
-              <option value="">공용 클라이언트</option>
-              {loaderData.admin?.teachers.map((teacher) => (
-                <option key={teacher.id} value={teacher.id}>
-                  {teacher.name}
-                </option>
-              ))}
-            </select>
           </Field>
           <Field label="기본 교실">
             <select
@@ -604,7 +610,7 @@ function AdminStudentsSection({
 }) {
   return (
     <SectionCard
-      title="학교 관리자 설정 · 학생"
+      title="학교 관리자 설정 · 학생 관리"
       description="학생을 등록하고 재학 상태를 변경합니다."
     >
       <div className="flex flex-col gap-4">
@@ -682,8 +688,8 @@ function AdminTeachersSection({
 }) {
   return (
     <SectionCard
-      title="학교 관리자 설정 · 선생"
-      description="선생 계정을 생성하고 Auth 계정을 삭제합니다."
+      title="학교 관리자 설정 · 선생님 관리"
+      description="선생님 계정을 생성 혹은 삭제합니다."
     >
       <div className="flex flex-col gap-4">
         <Form
@@ -751,78 +757,104 @@ function AdminAttendanceSection({
   loaderData: Route.ComponentProps["loaderData"];
   isSubmitting: boolean;
 }) {
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    const formData = new FormData(event.currentTarget);
+
+    try {
+      parseAttendanceMarkInput({
+        studentId: formData.get("studentId"),
+        status: formData.get("status"),
+        startDate: formData.get("startDate"),
+        endDate: formData.get("endDate"),
+        startPeriod: formData.get("startPeriod"),
+        endPeriod: formData.get("endPeriod"),
+      });
+    } catch (error) {
+      event.preventDefault();
+      toast.error(
+        error instanceof Error ? error.message : "입력값을 확인해 주세요.",
+      );
+    }
+  }
+
   return (
     <SectionCard
       title="학교 관리자 설정 · 공결 / 병결"
-      description="학교 세션과 학생을 선택해 공결 또는 병결 처리합니다."
+      description="날짜 범위를 지정해 공결 또는 병결을 일괄 처리합니다."
     >
       <Form
         method="post"
+        noValidate
+        onSubmit={handleSubmit}
         className="grid gap-4 rounded-xl border border-border/70 p-4"
       >
         <input type="hidden" name="intent" value="mark-attendance" />
-        <Field label="세션">
-          <select name="lectureSessionId" className={fieldClassName}>
-            {loaderData.admin?.lectureSessions.map((lectureSession) => (
-              <option key={lectureSession.id} value={lectureSession.id}>
-                {lectureSession.sessionDate} · {lectureSession.period}교시 ·{" "}
-                {lectureSession.name}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="학생">
-          <select name="studentId" className={fieldClassName}>
-            {loaderData.admin?.students.map((student) => (
-              <option key={student.id} value={student.id}>
-                {student.num}번 {student.name}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="출석 상태">
-          <select
-            name="status"
-            className={fieldClassName}
-            defaultValue="excused"
-          >
-            <option value="excused">공결</option>
-            <option value="sick leave">병결</option>
-          </select>
-        </Field>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="학생">
+            <select name="studentId" className={fieldClassName}>
+              {loaderData.admin?.students.map((student) => (
+                <option key={student.id} value={student.id}>
+                  {student.num}번 {student.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="출석 상태">
+            <select
+              name="status"
+              className={fieldClassName}
+              defaultValue="excused"
+            >
+              <option value="excused">공결</option>
+              <option value="sick leave">병결</option>
+            </select>
+          </Field>
+          <div className="grid gap-4">
+            <Field label="시작 날짜">
+              <input
+                name="startDate"
+                type="date"
+                className={fieldClassName}
+                required
+              />
+            </Field>
+            <Field label="종료 날짜">
+              <input
+                name="endDate"
+                type="date"
+                className={fieldClassName}
+                required
+              />
+            </Field>
+          </div>
+          <div className="grid gap-4">
+            <Field label="시작 교시">
+              <input
+                name="startPeriod"
+                type="number"
+                min={1}
+                className={fieldClassName}
+                required
+              />
+            </Field>
+            <Field label="종료 교시">
+              <input
+                name="endPeriod"
+                type="number"
+                min={1}
+                className={fieldClassName}
+                required
+              />
+            </Field>
+          </div>
+        </div>
         <div>
           <Button type="submit" disabled={isSubmitting}>
-            상태 저장
+            일괄 처리
           </Button>
         </div>
       </Form>
     </SectionCard>
-  );
-}
-
-function ActionNotice({
-  actionData,
-}: {
-  actionData: TeacherSettingsActionResult;
-}) {
-  return (
-    <Card
-      className={
-        actionData.ok ? "border-emerald-500/30" : "border-destructive/40"
-      }
-    >
-      <CardHeader>
-        <CardTitle>{actionData.ok ? "저장 완료" : "저장 실패"}</CardTitle>
-        <CardDescription>{actionData.message}</CardDescription>
-      </CardHeader>
-      {actionData.token ? (
-        <CardContent>
-          <div className="rounded-xl border border-border/70 bg-muted/30 px-4 py-3 font-mono text-sm">
-            {actionData.token}
-          </div>
-        </CardContent>
-      ) : null}
-    </Card>
   );
 }
 
@@ -924,7 +956,9 @@ function ClientCard({
     id: string;
     name: string;
     active: boolean;
+    clientType: "teacher" | "classroom";
     defaultClassroomId?: string;
+    defaultClassroomName?: string;
     ownerTeacherId?: string;
     lastSeenAt?: string;
   };
@@ -934,23 +968,103 @@ function ClientCard({
       <div>
         <p className="text-sm font-medium">{client.name}</p>
         <p className="text-xs text-muted-foreground">
+          {client.clientType === "teacher" ? "선생님용" : "교실용"} ·{" "}
           {client.active ? "활성" : "비활성"}
-          {client.defaultClassroomId
-            ? ` · 교실 ${client.defaultClassroomId}`
-            : ""}
+          {client.defaultClassroomName
+            ? ` · 교실 ${client.defaultClassroomName}`
+            : client.defaultClassroomId
+              ? ` · 교실 ${client.defaultClassroomId}`
+              : ""}
           {client.lastSeenAt ? ` · 마지막 연결 ${client.lastSeenAt}` : ""}
         </p>
       </div>
-      {client.active ? (
+      <div className="flex items-center gap-2">
         <Form method="post">
-          <input type="hidden" name="intent" value="deactivate-client" />
+          <input
+            type="hidden"
+            name="intent"
+            value={client.active ? "deactivate-client" : "reactivate-client"}
+          />
           <input type="hidden" name="clientId" value={client.id} />
           <Button type="submit" variant="outline" size="sm">
-            비활성화
+            {client.active ? "비활성화" : "재활성화"}
           </Button>
         </Form>
-      ) : null}
+        <DeleteClientButton clientId={client.id} clientName={client.name} />
+      </div>
     </div>
+  );
+}
+
+function DeleteClientButton({
+  clientId,
+  clientName,
+}: {
+  clientId: string;
+  clientName: string;
+}) {
+  const submit = useSubmit();
+
+  return (
+    <Button
+      type="button"
+      variant="destructive"
+      size="sm"
+      onClick={() => {
+        if (!window.confirm(`${clientName} 클라이언트를 완전히 삭제할까요?`)) {
+          return;
+        }
+
+        const formData = new FormData();
+        formData.set("intent", "delete-client");
+        formData.set("clientId", clientId);
+        submit(formData, { method: "post" });
+      }}
+    >
+      삭제
+    </Button>
+  );
+}
+
+function TokenDialog({
+  open,
+  token,
+  onOpenChange,
+}: {
+  open: boolean;
+  token: string;
+  onOpenChange: (open: boolean) => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>클라이언트 토큰 발급 완료</DialogTitle>
+          <DialogDescription>
+            이 토큰은 지금만 확인할 수 있습니다. 복사해서 안전한 곳에 보관해
+            주세요.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="rounded-2xl border border-border bg-muted/30 px-4 py-3 font-mono text-sm break-all">
+          {token}
+        </div>
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={async () => {
+              await navigator.clipboard.writeText(token);
+              toast.success("토큰을 복사했습니다.");
+            }}
+          >
+            복사
+          </Button>
+          <Button type="button" onClick={() => onOpenChange(false)}>
+            닫기
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

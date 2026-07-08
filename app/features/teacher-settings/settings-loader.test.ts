@@ -140,9 +140,16 @@ function createLoaderSupabase({ isAdmin = true }: { isAdmin?: boolean } = {}) {
                         : "Teacher Laptop",
                     active: true,
                     default_classroom_id: null,
+                    classroom: null,
                     owner_teacher_id:
                       column === "school_id" ? null : "teacher-row-1",
                     last_seen_at: null,
+                    ...(column === "school_id"
+                      ? {
+                          default_classroom_id: "classroom-1",
+                          classroom: { name: "Room A" },
+                        }
+                      : {}),
                   },
                 ],
                 error: null,
@@ -224,7 +231,6 @@ describe("loadTeacherSettingsData", () => {
     ).resolves.toMatchObject({
       admin: {
         clients: [{ id: "client-2" }],
-        lectureSessions: [{ id: "session-1" }],
         students: [{ id: "student-1" }],
         teachers: [{ id: "teacher-row-1", userId: "user-1" }],
       },

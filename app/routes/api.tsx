@@ -188,20 +188,32 @@ export async function action({ request }: Route.ActionArgs) {
 
     const currentSessionsForClient = (currentSessions ?? []).filter(
       (session) => {
-        const isEligible =
-          enrolledSessionIds.includes(session.id) ||
-          (session.lecture_id
-            ? enrolledLectureIds.includes(session.lecture_id)
-            : false);
+        const isEligibleBySession = enrolledSessionIds.includes(session.id);
+        const isEligibleByLecture = session.lecture_id
+          ? enrolledLectureIds.includes(session.lecture_id)
+          : false;
+        const isTeacherClient = Boolean(attendanceClient.owner_teacher_id);
+        const isClassroomClient = Boolean(
+          attendanceClient.default_classroom_id,
+        );
+
+        const isEligible = session.lecture_id
+          ? isEligibleByLecture
+          : isEligibleBySession;
 
         if (!isEligible) {
           return false;
         }
 
-        return (
-          session.classroom_id === attendanceClient.default_classroom_id ||
-          session.teacher_id === attendanceClient.owner_teacher_id
-        );
+        if (isTeacherClient) {
+          return session.teacher_id === attendanceClient.owner_teacher_id;
+        }
+
+        if (isClassroomClient) {
+          return session.classroom_id === attendanceClient.default_classroom_id;
+        }
+
+        return false;
       },
     );
 

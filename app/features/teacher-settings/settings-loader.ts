@@ -101,7 +101,7 @@ export async function loadTeacherSettingsData({
     supabase
       .from("attendance_clients")
       .select(
-        "id, name, active, default_classroom_id, owner_teacher_id, last_seen_at",
+        "id, name, active, default_classroom_id, owner_teacher_id, last_seen_at, classroom:classrooms!attendance_clients_default_classroom_id_fkey(name)",
       )
       .eq("owner_teacher_id", actor.id)
       .order("created_at", { ascending: true }),
@@ -136,36 +136,36 @@ export async function loadTeacherSettingsData({
 
   const admin = actor.is_admin
     ? await (async () => {
-        const [adminClientsResult, adminTeachersResult, lectureSessionsResult] =
-          await Promise.all([
-            supabase
-              .from("attendance_clients")
-              .select(
-                "id, name, active, default_classroom_id, owner_teacher_id, last_seen_at",
-              )
-              .eq("school_id", actor.school_id)
-              .order("created_at", { ascending: true }),
-            supabase
-              .from("teachers")
-              .select("id, user_id, name, is_admin")
-              .eq("school_id", actor.school_id)
-              .order("created_at", { ascending: true }),
-            supabase
-              .from("lecture_sessions")
-              .select("id, name, session_date, period")
-              .eq("school_id", actor.school_id)
-              .order("session_date", { ascending: false }),
-          ]);
+        const [adminClientsResult, adminTeachersResult] = await Promise.all([
+          supabase
+            .from("attendance_clients")
+            .select(
+              "id, name, active, default_classroom_id, owner_teacher_id, last_seen_at, classroom:classrooms!attendance_clients_default_classroom_id_fkey(name)",
+            )
+            .eq("school_id", actor.school_id)
+            .order("created_at", { ascending: true }),
+          supabase
+            .from("teachers")
+            .select("id, user_id, name, is_admin")
+            .eq("school_id", actor.school_id)
+            .order("created_at", { ascending: true }),
+        ]);
 
         return {
-          clients: (adminClientsResult.data ?? []).map((client) => ({
-            id: client.id,
-            name: client.name,
-            active: client.active,
-            defaultClassroomId: client.default_classroom_id ?? undefined,
-            ownerTeacherId: client.owner_teacher_id ?? undefined,
-            lastSeenAt: client.last_seen_at ?? undefined,
-          })),
+          clients: (adminClientsResult.data ?? [])
+            .map((client) => ({
+              id: client.id,
+              name: client.name,
+              active: client.active,
+              clientType: (client.owner_teacher_id === null
+                ? "classroom"
+                : "teacher") as "teacher" | "classroom",
+              defaultClassroomId: client.default_classroom_id ?? undefined,
+              defaultClassroomName: client.classroom?.name ?? undefined,
+              ownerTeacherId: client.owner_teacher_id ?? undefined,
+              lastSeenAt: client.last_seen_at ?? undefined,
+            }))
+            .filter((client) => client.clientType === "classroom"),
           students,
           teachers: (adminTeachersResult.data ?? [])
             .filter((teacher) => teacher.id && teacher.name)
@@ -174,23 +174,6 @@ export async function loadTeacherSettingsData({
               userId: teacher.user_id ?? undefined,
               name: teacher.name ?? "",
               isAdmin: Boolean(teacher.is_admin),
-            })),
-          lectureSessions: (lectureSessionsResult.data ?? [])
-            .filter(
-              (
-                lectureSession,
-              ): lectureSession is {
-                id: string;
-                name: string | null;
-                session_date: string;
-                period: number;
-              } => Boolean(lectureSession.id && lectureSession.session_date),
-            )
-            .map((lectureSession) => ({
-              id: lectureSession.id,
-              name: lectureSession.name ?? "이름 없는 수업",
-              sessionDate: lectureSession.session_date,
-              period: lectureSession.period,
             })),
         };
       })()
@@ -227,7 +210,9 @@ export async function loadTeacherSettingsData({
       id: client.id,
       name: client.name,
       active: client.active,
+      clientType: "teacher" as const,
       defaultClassroomId: client.default_classroom_id ?? undefined,
+      defaultClassroomName: client.classroom?.name ?? undefined,
       ownerTeacherId: client.owner_teacher_id ?? undefined,
       lastSeenAt: client.last_seen_at ?? undefined,
     })),

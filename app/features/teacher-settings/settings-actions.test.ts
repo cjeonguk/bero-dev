@@ -5,6 +5,16 @@ import { handleTeacherSettingsAction } from "./settings-actions";
 type ActionSupabaseOptions = {
   actorIsAdmin?: boolean;
   teacherUserId?: string | null;
+  attendanceClient?: {
+    id: string;
+    school_id: string;
+    owner_teacher_id: string | null;
+    default_classroom_id: string | null;
+    active?: boolean;
+    name?: string;
+  };
+  matchingSessionIds?: string[];
+  matchingAttendanceCount?: number;
 };
 
 function createActionSupabase(options: ActionSupabaseOptions = {}) {
@@ -17,6 +27,10 @@ function createActionSupabase(options: ActionSupabaseOptions = {}) {
     schema: string;
     fn: string;
     args: Record<string, unknown>;
+  }> = [];
+  const lectureSessionFilters: Array<{
+    method: string;
+    args: unknown[];
   }> = [];
 
   const actor = {
@@ -68,6 +82,15 @@ function createActionSupabase(options: ActionSupabaseOptions = {}) {
       }
 
       if (table === "attendance_clients") {
+        const attendanceClient = options.attendanceClient ?? {
+          id: "client-1",
+          school_id: "school-1",
+          owner_teacher_id: "teacher-row-1",
+          default_classroom_id: null,
+          active: true,
+          name: "Teacher Laptop",
+        };
+
         return {
           insert: vi.fn((values: unknown) => {
             inserts.push({ table, values });
@@ -82,14 +105,20 @@ function createActionSupabase(options: ActionSupabaseOptions = {}) {
           select: vi.fn(() => ({
             eq: vi.fn(() => ({
               single: vi.fn().mockResolvedValue({
-                data: {
-                  id: "client-1",
-                  school_id: "school-1",
-                  owner_teacher_id: "teacher-row-1",
-                },
+                data: attendanceClient,
+                error: null,
+              }),
+              maybeSingle: vi.fn().mockResolvedValue({
+                data: attendanceClient,
                 error: null,
               }),
             })),
+          })),
+          delete: vi.fn(() => ({
+            eq: vi.fn((id: string) => {
+              deletes.push({ table, filters: { id } });
+              return Promise.resolve({ error: null });
+            }),
           })),
         };
       }
@@ -151,11 +180,66 @@ function createActionSupabase(options: ActionSupabaseOptions = {}) {
         };
       }
 
+      if (table === "lecture_sessions") {
+        const sessionIds = options.matchingSessionIds ?? [
+          "session-1",
+          "session-2",
+        ];
+        const result = Promise.resolve({
+          data: sessionIds.map((id: string) => ({ id })),
+          error: null,
+        });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const builder: Record<string, any> = {
+          select: vi.fn(() => builder),
+          eq: vi.fn((...args: unknown[]) => {
+            lectureSessionFilters.push({ method: "eq", args });
+            return builder;
+          }),
+          gte: vi.fn((...args: unknown[]) => {
+            lectureSessionFilters.push({ method: "gte", args });
+            return builder;
+          }),
+          lte: vi.fn((...args: unknown[]) => {
+            lectureSessionFilters.push({ method: "lte", args });
+            return builder;
+          }),
+          or: vi.fn((...args: unknown[]) => {
+            lectureSessionFilters.push({ method: "or", args });
+            return builder;
+          }),
+          then: result.then.bind(result),
+        };
+        return builder;
+      }
+
       if (table === "attendances") {
+        const attendanceCount = options.matchingAttendanceCount ?? 2;
         return {
           upsert: vi.fn((values: unknown) => {
             upserts.push({ table, values });
             return Promise.resolve({ error: null });
+          }),
+          update: vi.fn((values: unknown) => {
+            updates.push({ table, values });
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const filter: Record<string, any> = {
+              eq: vi.fn(() => filter),
+              in: vi.fn(() => filter),
+              select: vi.fn(() =>
+                Promise.resolve({
+                  data:
+                    attendanceCount > 0
+                      ? Array.from({ length: attendanceCount }, (_, i) => ({
+                          id: `att-${String(i)}`,
+                          status: (values as Record<string, string>).status,
+                        }))
+                      : [],
+                  error: null,
+                }),
+              ),
+            };
+            return filter;
           }),
         };
       }
@@ -170,7 +254,15 @@ function createActionSupabase(options: ActionSupabaseOptions = {}) {
     })),
   };
 
-  return { supabase, inserts, updates, deletes, upserts, rpcs };
+  return {
+    supabase,
+    inserts,
+    updates,
+    deletes,
+    upserts,
+    rpcs,
+    lectureSessionFilters,
+  };
 }
 
 function createServiceRoleSupabase() {
@@ -252,9 +344,9 @@ describe("handleTeacherSettingsAction", () => {
     });
   });
 
-  it("creates an owned attendance client and returns the raw token once", async () => {
+  it("creates a teacher client for the signed-in teacher and returns the raw token once", async () => {
     const { result, inserts } = await submitAction({
-      intent: "create-client",
+      intent: "create-teacher-client",
       name: "Teacher Laptop",
     });
 
@@ -269,6 +361,58 @@ describe("handleTeacherSettingsAction", () => {
         owner_teacher_id: "teacher-row-1",
         school_id: "school-1",
         name: "Teacher Laptop",
+        default_classroom_id: null,
+      }),
+    });
+  });
+
+  it("creates a classroom client for school admins", async () => {
+    const { result, inserts } = await submitAction(
+      {
+        intent: "create-classroom-client",
+        name: "Room A Tablet",
+        defaultClassroomId: "classroom-1",
+      },
+      { actorIsAdmin: true },
+    );
+
+    expect(result).toMatchObject({ ok: true, token: "plain-text-token" });
+    expect(inserts).toContainEqual({
+      table: "attendance_clients",
+      values: expect.objectContaining({
+        owner_teacher_id: null,
+        default_classroom_id: "classroom-1",
+        school_id: "school-1",
+      }),
+    });
+  });
+
+  it("rejects classroom client creation for non-admin teachers", async () => {
+    await expect(
+      submitAction({
+        intent: "create-classroom-client",
+        name: "Room A Tablet",
+        defaultClassroomId: "classroom-1",
+      }),
+    ).rejects.toThrow("admin privileges are required");
+  });
+
+  it("allows admins to create their own teacher client", async () => {
+    const { result, inserts } = await submitAction(
+      {
+        intent: "create-teacher-client",
+        name: "Principal Laptop",
+      },
+      { actorIsAdmin: true },
+    );
+
+    expect(result).toMatchObject({ ok: true, token: "plain-text-token" });
+    expect(inserts).toContainEqual({
+      table: "attendance_clients",
+      values: expect.objectContaining({
+        owner_teacher_id: "teacher-row-1",
+        default_classroom_id: null,
+        name: "Principal Laptop",
       }),
     });
   });
@@ -422,6 +566,122 @@ describe("handleTeacherSettingsAction", () => {
     });
   });
 
+  it("deactivates, reactivates, and deletes a teacher-owned client", async () => {
+    const deactivateResult = await submitAction({
+      intent: "deactivate-client",
+      clientId: "client-1",
+    });
+    const reactivateResult = await submitAction({
+      intent: "reactivate-client",
+      clientId: "client-1",
+    });
+    const deleteResult = await submitAction({
+      intent: "delete-client",
+      clientId: "client-1",
+    });
+
+    expect(deactivateResult.result).toEqual({
+      ok: true,
+      message: "클라이언트를 비활성화했습니다.",
+    });
+    expect(deactivateResult.updates).toContainEqual({
+      table: "attendance_clients",
+      values: { active: false },
+    });
+
+    expect(reactivateResult.result).toEqual({
+      ok: true,
+      message: "클라이언트를 재활성화했습니다.",
+    });
+    expect(reactivateResult.updates).toContainEqual({
+      table: "attendance_clients",
+      values: { active: true },
+    });
+
+    expect(deleteResult.result).toEqual({
+      ok: true,
+      message: "클라이언트를 삭제했습니다.",
+    });
+  });
+
+  it("allows admins to manage classroom clients only", async () => {
+    const classroomClient = {
+      id: "client-2",
+      school_id: "school-1",
+      owner_teacher_id: null,
+      default_classroom_id: "classroom-1",
+      active: false,
+      name: "Room A Tablet",
+    };
+
+    const reactivateResult = await submitAction(
+      {
+        intent: "reactivate-client",
+        clientId: "client-2",
+      },
+      { actorIsAdmin: true, attendanceClient: classroomClient },
+    );
+    const deleteResult = await submitAction(
+      {
+        intent: "delete-client",
+        clientId: "client-2",
+      },
+      { actorIsAdmin: true, attendanceClient: classroomClient },
+    );
+
+    expect(reactivateResult.result.ok).toBe(true);
+    expect(deleteResult.result.ok).toBe(true);
+  });
+
+  it("allows admins to manage their own teacher-owned clients", async () => {
+    const teacherClient = {
+      id: "client-3",
+      school_id: "school-1",
+      owner_teacher_id: "teacher-row-1",
+      default_classroom_id: null,
+      active: true,
+      name: "Principal Laptop",
+    };
+
+    const deactivateResult = await submitAction(
+      {
+        intent: "deactivate-client",
+        clientId: "client-3",
+      },
+      { actorIsAdmin: true, attendanceClient: teacherClient },
+    );
+    const deleteResult = await submitAction(
+      {
+        intent: "delete-client",
+        clientId: "client-3",
+      },
+      { actorIsAdmin: true, attendanceClient: teacherClient },
+    );
+
+    expect(deactivateResult.result.ok).toBe(true);
+    expect(deleteResult.result.ok).toBe(true);
+  });
+
+  it("rejects admins deleting another teacher's teacher-owned clients", async () => {
+    await expect(
+      submitAction(
+        {
+          intent: "delete-client",
+          clientId: "client-1",
+        },
+        {
+          actorIsAdmin: true,
+          attendanceClient: {
+            id: "client-1",
+            school_id: "school-1",
+            owner_teacher_id: "teacher-row-9",
+            default_classroom_id: null,
+          },
+        },
+      ),
+    ).rejects.toThrow("admins can only manage classroom clients");
+  });
+
   it("creates and deactivates students as a school admin", async () => {
     const createResult = await submitAction(
       {
@@ -517,25 +777,180 @@ describe("handleTeacherSettingsAction", () => {
     });
   });
 
-  it("marks attendance as excused or sick leave for school admins", async () => {
-    const { result, upserts } = await submitAction(
-      {
-        intent: "mark-attendance",
-        lectureSessionId: "session-1",
-        studentId: "student-1",
-        status: "excused",
-      },
-      { actorIsAdmin: true },
-    );
+  describe("mark-attendance", () => {
+    it("bulk-updates attendances for sessions in a continuous multi-day range", async () => {
+      const { result, updates, lectureSessionFilters } = await submitAction(
+        {
+          intent: "mark-attendance",
+          studentId: "student-1",
+          startDate: "2026-07-01",
+          endDate: "2026-07-10",
+          startPeriod: "6",
+          endPeriod: "2",
+          status: "excused",
+        },
+        {
+          actorIsAdmin: true,
+          matchingSessionIds: ["s1", "s2", "s3"],
+          matchingAttendanceCount: 5,
+        },
+      );
 
-    expect(result).toEqual({ ok: true, message: "출석 상태를 저장했습니다." });
-    expect(upserts).toContainEqual({
-      table: "attendances",
-      values: {
-        lecture_session_id: "session-1",
-        student_id: "student-1",
-        status: "excused",
-      },
+      expect(result).toEqual({
+        ok: true,
+        message: "5개 세션의 출석 상태를 저장했습니다.",
+      });
+      expect(updates).toContainEqual({
+        table: "attendances",
+        values: { status: "excused" },
+      });
+      expect(lectureSessionFilters).toContainEqual({
+        method: "eq",
+        args: ["school_id", "school-1"],
+      });
+      expect(lectureSessionFilters).toContainEqual({
+        method: "or",
+        args: [
+          "and(session_date.eq.2026-07-01,period.gte.6),and(session_date.gt.2026-07-01,session_date.lt.2026-07-10),and(session_date.eq.2026-07-10,period.lte.2)",
+        ],
+      });
+    });
+
+    it("uses a same-day period range when start and end dates match", async () => {
+      const { result, lectureSessionFilters } = await submitAction(
+        {
+          intent: "mark-attendance",
+          studentId: "student-1",
+          startDate: "2026-07-01",
+          endDate: "2026-07-01",
+          startPeriod: "1",
+          endPeriod: "4",
+          status: "excused",
+        },
+        {
+          actorIsAdmin: true,
+          matchingSessionIds: ["s1"],
+        },
+      );
+
+      expect(result.ok).toBe(true);
+      expect(lectureSessionFilters).toContainEqual({
+        method: "eq",
+        args: ["school_id", "school-1"],
+      });
+      expect(lectureSessionFilters).toContainEqual({
+        method: "eq",
+        args: ["session_date", "2026-07-01"],
+      });
+      expect(lectureSessionFilters).toContainEqual({
+        method: "gte",
+        args: ["period", 1],
+      });
+      expect(lectureSessionFilters).toContainEqual({
+        method: "lte",
+        args: ["period", 4],
+      });
+      expect(
+        lectureSessionFilters.some((filter) => filter.method === "or"),
+      ).toBe(false);
+    });
+
+    it("returns a message when no lecture sessions match the range", async () => {
+      const { result, updates } = await submitAction(
+        {
+          intent: "mark-attendance",
+          studentId: "student-1",
+          startDate: "2026-08-01",
+          endDate: "2026-08-10",
+          startPeriod: "1",
+          endPeriod: "4",
+          status: "excused",
+        },
+        {
+          actorIsAdmin: true,
+          matchingSessionIds: [],
+        },
+      );
+
+      expect(result).toEqual({
+        ok: true,
+        message: "해당 기간/교시에 세션이 없습니다.",
+      });
+      expect(updates).toHaveLength(0);
+    });
+
+    it("returns a message when no attendances exist for matching sessions", async () => {
+      const { result } = await submitAction(
+        {
+          intent: "mark-attendance",
+          studentId: "student-1",
+          startDate: "2026-07-01",
+          endDate: "2026-07-10",
+          startPeriod: "1",
+          endPeriod: "4",
+          status: "excused",
+        },
+        {
+          actorIsAdmin: true,
+          matchingSessionIds: ["s1"],
+          matchingAttendanceCount: 0,
+        },
+      );
+
+      expect(result).toEqual({
+        ok: true,
+        message: "해당 기간/교시에 처리할 출석 대상이 없습니다.",
+      });
+    });
+
+    it("rejects when start date is after end date", async () => {
+      await expect(
+        submitAction(
+          {
+            intent: "mark-attendance",
+            studentId: "student-1",
+            startDate: "2026-07-10",
+            endDate: "2026-07-01",
+            startPeriod: "1",
+            endPeriod: "4",
+            status: "excused",
+          },
+          { actorIsAdmin: true },
+        ),
+      ).rejects.toThrow("종료일은 시작일보다 이후여야 합니다.");
+    });
+
+    it("rejects when start period is after end period on the same day", async () => {
+      await expect(
+        submitAction(
+          {
+            intent: "mark-attendance",
+            studentId: "student-1",
+            startDate: "2026-07-01",
+            endDate: "2026-07-01",
+            startPeriod: "4",
+            endPeriod: "1",
+            status: "excused",
+          },
+          { actorIsAdmin: true },
+        ),
+      ).rejects.toThrow(
+        "같은 날짜에서는 종료 교시가 시작 교시보다 작을 수 없습니다.",
+      );
+    });
+
+    it("rejects non-admin teachers", async () => {
+      await expect(
+        submitAction({
+          intent: "mark-attendance",
+          studentId: "student-1",
+          startDate: "2026-07-01",
+          endDate: "2026-07-10",
+          startPeriod: "1",
+          endPeriod: "4",
+          status: "excused",
+        }),
+      ).rejects.toThrow("admin privileges are required");
     });
   });
 });

@@ -3,9 +3,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "~/types/database.types";
 import {
   getTodayInSeoul,
-  isAttendanceOverrideStatus,
   isStudentStatus,
   parseJsonArrayField,
+  parseAttendanceMarkInput,
   toOptionalNumber,
   toOptionalString,
   toRequiredString,
@@ -113,6 +113,28 @@ async function syncFutureSessionAttendances({
   }
 }
 
+function buildAttendanceSessionRangeFilter({
+  startDate,
+  endDate,
+  startPeriod,
+  endPeriod,
+}: {
+  startDate: string;
+  endDate: string;
+  startPeriod: number;
+  endPeriod: number;
+}) {
+  if (startDate === endDate) {
+    return undefined;
+  }
+
+  return [
+    `and(session_date.eq.${startDate},period.gte.${startPeriod})`,
+    `and(session_date.gt.${startDate},session_date.lt.${endDate})`,
+    `and(session_date.eq.${endDate},period.lte.${endPeriod})`,
+  ].join(",");
+}
+
 export async function handleTeacherSettingsAction({
   request,
   supabase,
@@ -148,22 +170,16 @@ export async function handleTeacherSettingsAction({
     return { ok: true, message: "프로필을 저장했습니다." };
   }
 
-  if (intent === "create-client") {
+  if (intent === "create-teacher-client") {
     const name = toRequiredString(formData.get("name"), "name");
     const token = generateToken();
-    const ownerTeacherId = toOptionalString(formData.get("ownerTeacherId"));
-    const defaultClassroomId = toOptionalString(
-      formData.get("defaultClassroomId"),
-    );
     const client = {
       id: generateId(),
       school_id: actor.school_id,
       name,
       token_hash: hashToken(token),
-      owner_teacher_id: actor.is_admin
-        ? (ownerTeacherId ?? actor.id)
-        : actor.id,
-      default_classroom_id: defaultClassroomId ?? null,
+      owner_teacher_id: actor.id,
+      default_classroom_id: null,
       active: true,
     };
 
@@ -175,18 +191,93 @@ export async function handleTeacherSettingsAction({
     return { ok: true, message: "클라이언트를 등록했습니다.", token };
   }
 
-  if (intent === "deactivate-client") {
+  if (intent === "create-classroom-client") {
+    ensureAdmin(actor);
+    const name = toRequiredString(formData.get("name"), "name");
+    const token = generateToken();
+    const defaultClassroomId = toRequiredString(
+      formData.get("defaultClassroomId"),
+      "defaultClassroomId",
+    );
+    const client = {
+      id: generateId(),
+      school_id: actor.school_id,
+      name,
+      token_hash: hashToken(token),
+      owner_teacher_id: null,
+      default_classroom_id: defaultClassroomId,
+      active: true,
+    };
+
+    const { error } = await supabase.from("attendance_clients").insert(client);
+    if (error) {
+      throw error;
+    }
+
+    return { ok: true, message: "클라이언트를 등록했습니다.", token };
+  }
+
+  if (
+    intent === "deactivate-client" ||
+    intent === "reactivate-client" ||
+    intent === "delete-client"
+  ) {
     const clientId = toRequiredString(formData.get("clientId"), "clientId");
+    const { data: client, error: clientError } = await supabase
+      .from("attendance_clients")
+      .select("id, school_id, owner_teacher_id, default_classroom_id")
+      .eq("id", clientId)
+      .maybeSingle();
+
+    if (clientError || !client?.id || client.school_id !== actor.school_id) {
+      throw clientError ?? new Error("client not found");
+    }
+
+    const isTeacherClient = Boolean(client.owner_teacher_id);
+    const isClassroomClient = Boolean(client.default_classroom_id);
+
+    if (!actor.is_admin) {
+      if (!isTeacherClient || client.owner_teacher_id !== actor.id) {
+        throw new Error("teachers can only manage their own teacher clients");
+      }
+    } else if (
+      !(
+        (isTeacherClient && client.owner_teacher_id === actor.id) ||
+        (isClassroomClient && client.owner_teacher_id === null)
+      )
+    ) {
+      throw new Error("admins can only manage classroom clients");
+    }
+
+    if (intent === "delete-client") {
+      const { error } = await supabase
+        .from("attendance_clients")
+        .delete()
+        .eq("id", clientId);
+
+      if (error) {
+        throw error;
+      }
+
+      return { ok: true, message: "클라이언트를 삭제했습니다." };
+    }
+
     const { error } = await supabase
       .from("attendance_clients")
-      .update({ active: false })
+      .update({ active: intent === "reactivate-client" })
       .eq("id", clientId);
 
     if (error) {
       throw error;
     }
 
-    return { ok: true, message: "클라이언트를 비활성화했습니다." };
+    return {
+      ok: true,
+      message:
+        intent === "reactivate-client"
+          ? "클라이언트를 재활성화했습니다."
+          : "클라이언트를 비활성화했습니다.",
+    };
   }
 
   if (intent === "create-lecture") {
@@ -414,30 +505,68 @@ export async function handleTeacherSettingsAction({
 
   if (intent === "mark-attendance") {
     ensureAdmin(actor);
-    const status = toRequiredString(formData.get("status"), "status");
-    if (!isAttendanceOverrideStatus(status)) {
-      throw new Error("invalid attendance status");
+    const { studentId, status, startDate, endDate, startPeriod, endPeriod } =
+      parseAttendanceMarkInput({
+        studentId: formData.get("studentId"),
+        status: formData.get("status"),
+        startDate: formData.get("startDate"),
+        endDate: formData.get("endDate"),
+        startPeriod: formData.get("startPeriod"),
+        endPeriod: formData.get("endPeriod"),
+      });
+
+    const sessionQuery = supabase
+      .from("lecture_sessions")
+      .select("id")
+      .eq("school_id", actor.school_id);
+
+    const sessionRangeFilter = buildAttendanceSessionRangeFilter({
+      startDate,
+      endDate,
+      startPeriod,
+      endPeriod,
+    });
+
+    const { data: sessions, error: sessionsError } =
+      startDate === endDate
+        ? await sessionQuery
+            .eq("session_date", startDate)
+            .gte("period", startPeriod)
+            .lte("period", endPeriod)
+        : await sessionQuery.or(sessionRangeFilter ?? "");
+
+    if (sessionsError) {
+      throw sessionsError;
     }
 
-    const { error } = await supabase.from("attendances").upsert(
-      {
-        lecture_session_id: toRequiredString(
-          formData.get("lectureSessionId"),
-          "lectureSessionId",
-        ),
-        student_id: toRequiredString(formData.get("studentId"), "studentId"),
-        status,
-      },
-      {
-        onConflict: "student_id,lecture_session_id",
-      },
-    );
-
-    if (error) {
-      throw error;
+    if (!sessions || sessions.length === 0) {
+      return { ok: true, message: "해당 기간/교시에 세션이 없습니다." };
     }
 
-    return { ok: true, message: "출석 상태를 저장했습니다." };
+    const sessionIds = sessions.map((s) => s.id);
+
+    const { data: rows, error: updateError } = await supabase
+      .from("attendances")
+      .update({ status })
+      .eq("student_id", studentId)
+      .in("lecture_session_id", sessionIds)
+      .select();
+
+    if (updateError) {
+      throw updateError;
+    }
+
+    if (!rows || rows.length === 0) {
+      return {
+        ok: true,
+        message: "해당 기간/교시에 처리할 출석 대상이 없습니다.",
+      };
+    }
+
+    return {
+      ok: true,
+      message: `${rows.length}개 세션의 출석 상태를 저장했습니다.`,
+    };
   }
 
   throw new Error(`unsupported intent: ${intent}`);
