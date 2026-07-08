@@ -392,9 +392,29 @@ describe("handleTeacherSettingsAction", () => {
         semester_id: 2,
       },
     });
+    expect(addResult.serviceRoleSupabase.rpcs).toContainEqual({
+      schema: "public",
+      fn: "sync_future_session_attendances_for_server",
+      args: {
+        target_lecture_id: "lecture-1",
+        target_student_id: "student-1",
+        sync_mode: "add",
+        from_date: "2026-07-08",
+      },
+    });
     expect(removeResult.result).toEqual({
       ok: true,
       message: "학생을 수업에서 제거했습니다.",
+    });
+    expect(removeResult.serviceRoleSupabase.rpcs).toContainEqual({
+      schema: "public",
+      fn: "sync_future_session_attendances_for_server",
+      args: {
+        target_lecture_id: "lecture-1",
+        target_student_id: "student-1",
+        sync_mode: "remove",
+        from_date: "2026-07-08",
+      },
     });
     expect(removeResult.deletes).toContainEqual({
       table: "enrollments",

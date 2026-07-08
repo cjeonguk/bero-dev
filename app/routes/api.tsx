@@ -140,29 +140,19 @@ export async function action({ request }: Route.ActionArgs) {
       return { success: false, studentName: studentInfo.name };
     }
 
-    const [
-      { data: enrollments, error: enrollmentError },
-      { data: specialSessionEnrollments, error: sessionEnrollmentError },
-    ] = await Promise.all([
-      supabase.from("enrollments").select("lecture_id").match({
+    const { data: enrollments, error: enrollmentError } = await supabase
+      .from("enrollments")
+      .select("lecture_id")
+      .match({
         student_id: studentInfo.id,
         semester_id: studentInfo.school.semester.id,
-      }),
-      supabase
-        .from("lecture_session_enrollments")
-        .select("lecture_session_id")
-        .eq("student_id", studentInfo.id),
-    ]);
+      });
 
     if (enrollmentError) throw enrollmentError;
-    if (sessionEnrollmentError) throw sessionEnrollmentError;
 
     const enrolledLectureIds = (enrollments ?? [])
       .map((enrollment) => enrollment.lecture_id)
       .filter((lectureId): lectureId is string => Boolean(lectureId));
-    const enrolledSessionIds = (specialSessionEnrollments ?? [])
-      .map((enrollment) => enrollment.lecture_session_id)
-      .filter((sessionId): sessionId is string => Boolean(sessionId));
 
     const { data: currentSessions, error: currentSessionsError } =
       await supabase
@@ -173,6 +163,28 @@ export async function action({ request }: Route.ActionArgs) {
         .eq("period", currentPeriod);
 
     if (currentSessionsError) throw currentSessionsError;
+
+    const currentSessionIds = (currentSessions ?? [])
+      .map((session) => session.id)
+      .filter((sessionId): sessionId is string => Boolean(sessionId));
+
+    const {
+      data: currentSessionAttendances,
+      error: currentSessionAttendancesError,
+    } =
+      currentSessionIds.length > 0
+        ? await supabase
+            .from("attendances")
+            .select("lecture_session_id")
+            .eq("student_id", studentInfo.id)
+            .in("lecture_session_id", currentSessionIds)
+        : { data: [], error: null };
+
+    if (currentSessionAttendancesError) throw currentSessionAttendancesError;
+
+    const enrolledSessionIds = (currentSessionAttendances ?? [])
+      .map((attendance) => attendance.lecture_session_id)
+      .filter((sessionId): sessionId is string => Boolean(sessionId));
 
     const currentSessionsForClient = (currentSessions ?? []).filter(
       (session) => {

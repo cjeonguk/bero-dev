@@ -78,6 +78,41 @@ async function refreshLectureSessions({
   }
 }
 
+async function syncFutureSessionAttendances({
+  serviceRoleSupabase,
+  lectureId,
+  studentId,
+  syncMode,
+  now,
+}: {
+  serviceRoleSupabase: TeacherSettingsServiceRoleClient;
+  lectureId: string;
+  studentId: string;
+  syncMode: "add" | "remove";
+  now: Date;
+}) {
+  const rpcClient = serviceRoleSupabase as unknown as {
+    rpc: (
+      fn: string,
+      args: Record<string, unknown>,
+    ) => Promise<{ error: unknown }>;
+  };
+  const { error } = await rpcClient.rpc(
+    "sync_future_session_attendances_for_server",
+    {
+      target_lecture_id: lectureId,
+      target_student_id: studentId,
+      sync_mode: syncMode,
+      from_date: getTodayInSeoul(now),
+    },
+  );
+
+  if (error) {
+    console.error("sync future session attendances failed", error);
+    throw new Error("failed to sync future session attendances");
+  }
+}
+
 export async function handleTeacherSettingsAction({
   request,
   supabase,
@@ -230,6 +265,14 @@ export async function handleTeacherSettingsAction({
       throw error;
     }
 
+    await syncFutureSessionAttendances({
+      serviceRoleSupabase,
+      lectureId,
+      studentId,
+      syncMode: "add",
+      now: now(),
+    });
+
     return { ok: true, message: "학생을 수업에 추가했습니다." };
   }
 
@@ -244,6 +287,14 @@ export async function handleTeacherSettingsAction({
     if (error) {
       throw error;
     }
+
+    await syncFutureSessionAttendances({
+      serviceRoleSupabase,
+      lectureId,
+      studentId,
+      syncMode: "remove",
+      now: now(),
+    });
 
     return { ok: true, message: "학생을 수업에서 제거했습니다." };
   }

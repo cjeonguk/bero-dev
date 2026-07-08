@@ -508,27 +508,9 @@ INSERT INTO public.lecture_sessions (
     'Standalone special lecture for local development'
   );
 
-INSERT INTO public.lecture_session_enrollments (
-  lecture_session_id,
-  student_id,
-  created_at
-) VALUES
-  ('5bc65875-f317-4efb-b9a9-53612aabf536', 'ce475247-5e94-45d9-9195-d700677237be', CURRENT_TIMESTAMP),
-  ('5bc65875-f317-4efb-b9a9-53612aabf536', '9de7d27b-0f5e-4cc4-a4e0-888333db9a70', CURRENT_TIMESTAMP);
-
-INSERT INTO public.attendances (
-  id,
-  student_id,
-  lecture_session_id,
-  status,
-  created_at
-)
-SELECT
-  attendance_seed.id,
-  attendance_seed.student_id,
-  lecture_session.id,
-  attendance_seed.status,
-  attendance_seed.created_at
+UPDATE public.attendances attendance
+SET status = attendance_seed.status,
+    created_at = attendance_seed.created_at
 FROM (
   VALUES
     ('53381d07-1401-445f-9acd-e0bcd8dfb1ee'::uuid, '1b212df6-4669-4d50-b835-50dd47ac94cb'::uuid, 'e728bdd7-e6c5-4484-8899-a94ccff997a6'::uuid, '2026-01-05'::date, 'present'::public.attendance_status, '2026-01-05 00:10:00+00'::timestamp with time zone, 1::bigint),
@@ -542,7 +524,9 @@ FROM (
 JOIN public.lecture_sessions lecture_session
   ON lecture_session.lecture_id = attendance_seed.lecture_id
  AND lecture_session.session_date = attendance_seed.attendance_date
- AND lecture_session.period = attendance_seed.period;
+ AND lecture_session.period = attendance_seed.period
+WHERE attendance.student_id = attendance_seed.student_id
+  AND attendance.lecture_session_id = lecture_session.id;
 
 INSERT INTO public.attendances (
   id,
@@ -557,9 +541,14 @@ INSERT INTO public.attendances (
     '5bc65875-f317-4efb-b9a9-53612aabf536',
     'present',
     CURRENT_TIMESTAMP
+  ),
+  (
+    'a07a7cce-ee0b-4925-8fc9-52ed7ef19382',
+    '9de7d27b-0f5e-4cc4-a4e0-888333db9a70',
+    '5bc65875-f317-4efb-b9a9-53612aabf536',
+    'absent',
+    CURRENT_TIMESTAMP
   );
-
-SELECT internal.seed_daily_attendances(CURRENT_DATE);
 
 SELECT pg_catalog.setval('public.semester_schedules_id_seq', 3, true);
 

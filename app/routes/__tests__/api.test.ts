@@ -20,7 +20,7 @@ type ActionSetupOptions = {
     end_time: string;
   }>;
   enrollments?: Array<{ lecture_id: string }>;
-  specialSessionEnrollments?: Array<{ lecture_session_id: string }>;
+  currentSessionAttendances?: Array<{ lecture_session_id: string }>;
   currentSessions?: Array<{
     id: string;
     lecture_id: string | null;
@@ -69,7 +69,7 @@ function setupActionTest(options: ActionSetupOptions = {}) {
   };
 
   const enrollments = options.enrollments ?? [{ lecture_id: "lecture-1" }];
-  const specialSessionEnrollments = options.specialSessionEnrollments ?? [];
+  const currentSessionAttendances = options.currentSessionAttendances ?? [];
   const currentSessions = options.currentSessions ?? [
     {
       id: "session-1",
@@ -123,17 +123,6 @@ function setupActionTest(options: ActionSetupOptions = {}) {
         };
       }
 
-      if (table === "lecture_session_enrollments") {
-        return {
-          select: vi.fn(() => ({
-            eq: vi.fn().mockResolvedValue({
-              data: specialSessionEnrollments,
-              error: null,
-            }),
-          })),
-        };
-      }
-
       if (table === "lecture_sessions") {
         return {
           select: vi.fn(() => ({
@@ -151,6 +140,14 @@ function setupActionTest(options: ActionSetupOptions = {}) {
 
       if (table === "attendances") {
         return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              in: vi.fn().mockResolvedValue({
+                data: currentSessionAttendances,
+                error: null,
+              }),
+            })),
+          })),
           upsert: upsertAttendance,
         };
       }
@@ -329,7 +326,7 @@ describe("api route action", () => {
   it("writes attendance for a standalone special session", async () => {
     const { request, upsertAttendance, updateStudentMatch } = setupActionTest({
       enrollments: [],
-      specialSessionEnrollments: [{ lecture_session_id: "session-special" }],
+      currentSessionAttendances: [{ lecture_session_id: "session-special" }],
       currentSessions: [
         {
           id: "session-special",

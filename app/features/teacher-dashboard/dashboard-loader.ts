@@ -3,7 +3,6 @@ import { data, redirect } from "react-router";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   buildTodaySchedule,
-  mergeStudentsWithAttendances,
   resolveDashboardViewState,
   selectLecture,
   type DashboardLecture,
@@ -311,60 +310,50 @@ export async function loadTeacherDashboardLectureDetailData({
     } satisfies TeacherDashboardLectureDetailLoaderData;
   }
 
-  const enrollmentQuery = lectureSession.lecture_id
-    ? dashboardSupabase
-        .from("enrollments")
-        .select(
-          `
-        student:student_id (
-        id,
-        name,
-        num
-        )`,
-        )
-        .eq("lecture_id", lectureSession.lecture_id)
-    : dashboardSupabase
-        .from("lecture_session_enrollments")
-        .select(
-          `
-        student:student_id (
-        id,
-        name,
-        num
-        )`,
-        )
-        .eq("lecture_session_id", lectureSession.id);
-
-  const [enrollmentsResult, attendancesResult] = await Promise.all([
-    enrollmentQuery,
-    dashboardSupabase
+  const { data: attendances, error: getAttendancesError } =
+    await dashboardSupabase
       .from("attendances")
-      .select("student_id, status")
-      .eq("lecture_session_id", lectureSession.id),
-  ]);
-
-  const { data: enrollments, error: getEnrollmentsError } = enrollmentsResult;
-  if (getEnrollmentsError) {
-    throw new Error("error in retrieving enrollments");
-  }
-
-  const students = (enrollments ?? [])
-    .map(({ student }) => student)
-    .filter((student): student is { id: string; name: string; num: string } =>
-      Boolean(student?.id && student.name && student.num),
-    );
-
-  const { data: attendances, error: getAttendancesError } = attendancesResult;
+      .select(
+        `
+      student_id,
+      status,
+      student:students!attendances_student_id_fkey (
+        id,
+        name,
+        num
+      )
+    `,
+      )
+      .eq("lecture_session_id", lectureSession.id);
   if (getAttendancesError) {
     throw new Error("error in retrieving attendances");
   }
 
   return {
     currentLecture,
-    students: mergeStudentsWithAttendances({
-      students,
-      attendances: attendances ?? [],
-    }),
+    students: (attendances ?? [])
+      .filter(
+        (
+          attendance,
+        ): attendance is {
+          student_id: string;
+          status: Database["public"]["Enums"]["attendance_status"];
+          student: { id: string; name: string; num: string };
+        } =>
+          Boolean(
+            attendance.student_id &&
+            attendance.status &&
+            attendance.student?.id &&
+            attendance.student.name &&
+            attendance.student.num,
+          ),
+      )
+      .map((attendance) => ({
+        id: attendance.student.id,
+        name: attendance.student.name,
+        num: attendance.student.num,
+        attendance: attendance.status,
+      })),
     viewState: "active-lecture",
   } satisfies TeacherDashboardLectureDetailLoaderData;
 }

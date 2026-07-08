@@ -69,6 +69,13 @@ export type Database = {
             referencedRelation: "lecture_sessions";
             referencedColumns: ["id"];
           },
+          {
+            foreignKeyName: "attendances_student_id_fkey";
+            columns: ["student_id"];
+            isOneToOne: false;
+            referencedRelation: "students";
+            referencedColumns: ["id"];
+          },
         ];
       };
       attendance_clients: {
@@ -255,39 +262,6 @@ export type Database = {
             columns: ["teacher_id"];
             isOneToOne: false;
             referencedRelation: "teachers";
-            referencedColumns: ["id"];
-          },
-        ];
-      };
-      lecture_session_enrollments: {
-        Row: {
-          created_at: string;
-          lecture_session_id: string;
-          student_id: string;
-        };
-        Insert: {
-          created_at?: string;
-          lecture_session_id: string;
-          student_id: string;
-        };
-        Update: {
-          created_at?: string;
-          lecture_session_id?: string;
-          student_id?: string;
-        };
-        Relationships: [
-          {
-            foreignKeyName: "lecture_session_enrollments_lecture_session_id_fkey";
-            columns: ["lecture_session_id"];
-            isOneToOne: false;
-            referencedRelation: "lecture_sessions";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "lecture_session_enrollments_student_id_fkey";
-            columns: ["student_id"];
-            isOneToOne: false;
-            referencedRelation: "students";
             referencedColumns: ["id"];
           },
         ];
@@ -537,7 +511,19 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
-      [_ in never]: never;
+      refresh_lecture_sessions_for_server: {
+        Args: { from_date?: string; target_lecture_id: string };
+        Returns: number;
+      };
+      sync_future_session_attendances_for_server: {
+        Args: {
+          from_date?: string;
+          sync_mode: string;
+          target_lecture_id: string;
+          target_student_id: string;
+        };
+        Returns: number;
+      };
     };
     Enums: {
       attendance_status:

@@ -151,25 +151,22 @@ function setupDetailClient() {
         };
       }
 
-      if (table === "enrollments") {
-        return {
-          select: vi.fn(() => ({
-            eq: vi.fn().mockResolvedValue({
-              data: [
-                { student: { id: "student-1", name: "Kim", num: "1" } },
-                { student: { id: "student-2", name: "Lee", num: "2" } },
-              ],
-              error: null,
-            }),
-          })),
-        };
-      }
-
       if (table === "attendances") {
         return {
           select: vi.fn(() => ({
             eq: vi.fn().mockResolvedValue({
-              data: [{ student_id: "student-2", status: "present" }],
+              data: [
+                {
+                  student_id: "student-1",
+                  status: "absent",
+                  student: { id: "student-1", name: "Kim", num: "1" },
+                },
+                {
+                  student_id: "student-2",
+                  status: "present",
+                  student: { id: "student-2", name: "Lee", num: "2" },
+                },
+              ],
               error: null,
             }),
           })),
@@ -214,22 +211,17 @@ function setupSpecialDetailClient() {
         };
       }
 
-      if (table === "lecture_session_enrollments") {
-        return {
-          select: vi.fn(() => ({
-            eq: vi.fn().mockResolvedValue({
-              data: [{ student: { id: "student-3", name: "Park", num: "3" } }],
-              error: null,
-            }),
-          })),
-        };
-      }
-
       if (table === "attendances") {
         return {
           select: vi.fn(() => ({
             eq: vi.fn().mockResolvedValue({
-              data: [],
+              data: [
+                {
+                  student_id: "student-3",
+                  status: "absent",
+                  student: { id: "student-3", name: "Park", num: "3" },
+                },
+              ],
               error: null,
             }),
           })),
@@ -307,11 +299,10 @@ describe("teacher dashboard loader helpers", () => {
     expect(supabase.from).toHaveBeenCalledWith("teachers");
     expect(supabase.from).toHaveBeenCalledWith("semester_schedules");
     expect(supabase.from).toHaveBeenCalledWith("lecture_sessions");
-    expect(supabase.from).not.toHaveBeenCalledWith("enrollments");
     expect(supabase.from).not.toHaveBeenCalledWith("attendances");
   });
 
-  it("loads lecture detail rows for the selected lecture and merges attendance", async () => {
+  it("loads lecture detail rows for the selected lecture from attendances", async () => {
     setupDetailClient();
 
     await expect(
@@ -335,7 +326,7 @@ describe("teacher dashboard loader helpers", () => {
     });
   });
 
-  it("loads a standalone special session from session enrollments", async () => {
+  it("loads a standalone special session from attendances", async () => {
     setupSpecialDetailClient();
 
     await expect(
