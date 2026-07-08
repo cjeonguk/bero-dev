@@ -71,6 +71,64 @@ export type Database = {
           },
         ];
       };
+      attendance_clients: {
+        Row: {
+          active: boolean;
+          created_at: string;
+          default_classroom_id: string | null;
+          id: string;
+          last_seen_at: string | null;
+          name: string;
+          owner_teacher_id: string | null;
+          school_id: string;
+          token_hash: string;
+        };
+        Insert: {
+          active?: boolean;
+          created_at?: string;
+          default_classroom_id?: string | null;
+          id?: string;
+          last_seen_at?: string | null;
+          name: string;
+          owner_teacher_id?: string | null;
+          school_id: string;
+          token_hash: string;
+        };
+        Update: {
+          active?: boolean;
+          created_at?: string;
+          default_classroom_id?: string | null;
+          id?: string;
+          last_seen_at?: string | null;
+          name?: string;
+          owner_teacher_id?: string | null;
+          school_id?: string;
+          token_hash?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "attendance_clients_default_classroom_id_fkey";
+            columns: ["default_classroom_id"];
+            isOneToOne: false;
+            referencedRelation: "classrooms";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "attendance_clients_owner_teacher_id_fkey";
+            columns: ["owner_teacher_id"];
+            isOneToOne: false;
+            referencedRelation: "teachers";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "attendance_clients_school_id_fkey";
+            columns: ["school_id"];
+            isOneToOne: false;
+            referencedRelation: "schools";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       classrooms: {
         Row: {
           created_at: string;

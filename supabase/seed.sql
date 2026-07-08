@@ -281,6 +281,43 @@ INSERT INTO public.teachers (id, created_at, name, school_id, is_admin) VALUES
   ('85991a44-f17b-4d20-85bc-9a56ec86fbd6', '2026-02-01 09:20:00+00', 'Teacher Bravo', 'b8ab83ad-39f4-44b7-91c7-f28794adc666', true),
   ('07993eea-ca5c-4902-b527-fcfeb7e5fdab', '2026-03-01 09:20:00+00', 'Teacher Charlie', 'f52d2304-22cb-4ea0-88f8-a196c6ef02ae', false);
 
+-- Raw tokens for local development:
+-- fixed-room-a-client => room-a-fixed-token
+-- teacher-bravo-laptop => teacher-mobile-token
+INSERT INTO public.attendance_clients (
+  id,
+  created_at,
+  school_id,
+  name,
+  token_hash,
+  active,
+  default_classroom_id,
+  owner_teacher_id,
+  last_seen_at
+) VALUES
+  (
+    'f37f4bea-2c44-4697-9061-0ad4f7ea4eb3',
+    '2026-01-01 09:22:00+00',
+    'd4289665-0d3e-4784-a06b-e97f2d595a5c',
+    'fixed-room-a-client',
+    'efd8dee9202e01f190612ea7532d25a4f256c004c216c5fe65b19273e993917e',
+    true,
+    '0d63e674-9f65-407f-865a-870e3ff524f0',
+    null,
+    null
+  ),
+  (
+    '7e596dc8-b267-46fd-8b11-84ad79d5e43d',
+    '2026-02-01 09:22:00+00',
+    'b8ab83ad-39f4-44b7-91c7-f28794adc666',
+    'teacher-bravo-laptop',
+    '6d59c90fe9f66f916ed114819899a2f59ef2a35e2557f8215eaa661100c4b68f',
+    true,
+    null,
+    '85991a44-f17b-4d20-85bc-9a56ec86fbd6',
+    null
+  );
+
 INSERT INTO public.lectures (
   id,
   created_at,

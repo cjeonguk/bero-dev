@@ -8,10 +8,12 @@ vi.mock("~/lib/supabase/server", () => ({
 }));
 
 const mockedCreateServiceRoleClient = vi.mocked(createServiceRoleClient);
+const testClientId = "attendance-client-1";
+const testToken = "test-device-token";
+const testTokenHash =
+  "fdc2f4194f79710d879d596f606d94f5e85f07f53b42d2b13f2e9aeb74d78c39";
 
 type ActionSetupOptions = {
-  requestClassroom?: string;
-  detectedClassroomName?: string;
   currentPeriodSchedules?: Array<{
     period: number;
     start_time: string;
@@ -23,13 +25,34 @@ type ActionSetupOptions = {
     id: string;
     lecture_id: string | null;
     classroom_id: string;
-    classroom: { name: string };
+    teacher_id?: string;
   }>;
+  attendanceClient?: {
+    id: string;
+    school_id: string;
+    token_hash: string;
+    active: boolean;
+    default_classroom_id: string | null;
+    owner_teacher_id: string | null;
+  } | null;
+  requestClientId?: string;
 };
 
 function setupActionTest(options: ActionSetupOptions = {}) {
   const upsertAttendance = vi.fn().mockResolvedValue({ error: null });
   const updateStudentMatch = vi.fn().mockResolvedValue({ error: null });
+  const updateAttendanceClientMatch = vi
+    .fn()
+    .mockResolvedValue({ error: null });
+
+  const attendanceClient = options.attendanceClient ?? {
+    id: testClientId,
+    school_id: "school-1",
+    token_hash: testTokenHash,
+    active: true,
+    default_classroom_id: "classroom-1",
+    owner_teacher_id: null,
+  };
 
   const studentInfo = {
     name: "Kim",
@@ -52,19 +75,36 @@ function setupActionTest(options: ActionSetupOptions = {}) {
       id: "session-1",
       lecture_id: "lecture-1",
       classroom_id: "classroom-1",
-      classroom: { name: options.detectedClassroomName ?? "Room A" },
+      teacher_id: "teacher-1",
     },
   ];
 
   const supabase = {
     from: vi.fn((table: string) => {
+      if (table === "attendance_clients") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              maybeSingle: vi
+                .fn()
+                .mockResolvedValue({ data: attendanceClient, error: null }),
+            })),
+          })),
+          update: vi.fn(() => ({
+            match: updateAttendanceClientMatch,
+          })),
+        };
+      }
+
       if (table === "students") {
         return {
           select: vi.fn(() => ({
             eq: vi.fn(() => ({
-              single: vi
-                .fn()
-                .mockResolvedValue({ data: studentInfo, error: null }),
+              eq: vi.fn(() => ({
+                maybeSingle: vi
+                  .fn()
+                  .mockResolvedValue({ data: studentInfo, error: null }),
+              })),
             })),
           })),
           update: vi.fn(() => ({
@@ -124,15 +164,15 @@ function setupActionTest(options: ActionSetupOptions = {}) {
   const request = new Request("http://localhost/api", {
     method: "POST",
     headers: {
-      authorization: "Bearer test-device-token",
+      authorization: `Bearer ${testToken}`,
       "content-type": "application/json",
     },
     body: JSON.stringify({
+      clientId: options.requestClientId ?? testClientId,
       deviceID: "device-1",
       rssi: -42,
       deviceName: "Beacon",
       timestamp: "2026-06-19T01:05:00.000Z",
-      classroom: options.requestClassroom ?? "Room A",
     }),
   });
 
@@ -140,6 +180,7 @@ function setupActionTest(options: ActionSetupOptions = {}) {
     request,
     upsertAttendance,
     updateStudentMatch,
+    updateAttendanceClientMatch,
   };
 }
 
@@ -157,17 +198,82 @@ describe("api route action", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-06-19T01:05:00.000Z"));
-    vi.stubEnv("DEVICE_API_TOKEN", "test-device-token");
   });
 
   afterEach(() => {
     vi.useRealTimers();
-    vi.unstubAllEnvs();
     vi.clearAllMocks();
   });
 
   it("updates the student location and upserts a present attendance for the current lecture", async () => {
-    const { request, upsertAttendance, updateStudentMatch } = setupActionTest();
+    const {
+      request,
+      upsertAttendance,
+      updateStudentMatch,
+      updateAttendanceClientMatch,
+    } = setupActionTest();
+
+    await expect(action(createActionArgs(request))).resolves.toEqual({
+      success: true,
+      studentName: "Kim",
+    });
+
+    expect(updateStudentMatch).toHaveBeenCalledWith({ id: "student-1" });
+    expect(updateAttendanceClientMatch).toHaveBeenCalledWith({
+      id: testClientId,
+    });
+    expect(upsertAttendance).toHaveBeenCalledWith(
+      {
+        student_id: "student-1",
+        lecture_session_id: "session-1",
+        status: "present",
+      },
+      {
+        onConflict: "student_id,lecture_session_id",
+      },
+    );
+  });
+
+  it("does not write attendance when the client does not resolve to a current session", async () => {
+    const { request, upsertAttendance, updateStudentMatch } = setupActionTest({
+      attendanceClient: {
+        id: testClientId,
+        school_id: "school-1",
+        token_hash: testTokenHash,
+        active: true,
+        default_classroom_id: "classroom-2",
+        owner_teacher_id: null,
+      },
+    });
+
+    await expect(action(createActionArgs(request))).resolves.toEqual({
+      success: false,
+      studentName: "Kim",
+    });
+
+    expect(updateStudentMatch).not.toHaveBeenCalled();
+    expect(upsertAttendance).not.toHaveBeenCalled();
+  });
+
+  it("infers the current session from owner_teacher_id without a default classroom", async () => {
+    const { request, upsertAttendance, updateStudentMatch } = setupActionTest({
+      attendanceClient: {
+        id: testClientId,
+        school_id: "school-1",
+        token_hash: testTokenHash,
+        active: true,
+        default_classroom_id: null,
+        owner_teacher_id: "teacher-1",
+      },
+      currentSessions: [
+        {
+          id: "session-1",
+          lecture_id: "lecture-1",
+          classroom_id: "classroom-99",
+          teacher_id: "teacher-1",
+        },
+      ],
+    });
 
     await expect(action(createActionArgs(request))).resolves.toEqual({
       success: true,
@@ -187,21 +293,6 @@ describe("api route action", () => {
     );
   });
 
-  it("does not write attendance when the detected classroom does not match", async () => {
-    const { request, upsertAttendance, updateStudentMatch } = setupActionTest({
-      requestClassroom: "Other Room",
-      detectedClassroomName: "Room A",
-    });
-
-    await expect(action(createActionArgs(request))).resolves.toEqual({
-      success: false,
-      studentName: "Kim",
-    });
-
-    expect(updateStudentMatch).not.toHaveBeenCalled();
-    expect(upsertAttendance).not.toHaveBeenCalled();
-  });
-
   it("writes attendance for the later period of a consecutive lecture", async () => {
     const { request, upsertAttendance, updateStudentMatch } = setupActionTest({
       currentPeriodSchedules: [
@@ -212,7 +303,7 @@ describe("api route action", () => {
           id: "session-4",
           lecture_id: "lecture-1",
           classroom_id: "classroom-1",
-          classroom: { name: "Room A" },
+          teacher_id: "teacher-1",
         },
       ],
     });
@@ -244,7 +335,7 @@ describe("api route action", () => {
           id: "session-special",
           lecture_id: null,
           classroom_id: "classroom-1",
-          classroom: { name: "Room A" },
+          teacher_id: "teacher-1",
         },
       ],
     });
@@ -300,6 +391,51 @@ describe("api route action", () => {
       studentName: "",
       error: "Unauthorized",
     });
-    expect(mockedCreateServiceRoleClient).not.toHaveBeenCalled();
+  });
+
+  it("rejects requests when the client token does not match", async () => {
+    const { request } = setupActionTest({
+      attendanceClient: {
+        id: testClientId,
+        school_id: "school-1",
+        token_hash: "not-the-right-hash",
+        active: true,
+        default_classroom_id: "classroom-1",
+        owner_teacher_id: null,
+      },
+    });
+
+    const response = await action(createActionArgs(request));
+
+    expect(response).toBeInstanceOf(Response);
+    expect((response as Response).status).toBe(401);
+    await expect((response as Response).json()).resolves.toEqual({
+      success: false,
+      studentName: "",
+      error: "Unauthorized",
+    });
+  });
+
+  it("rejects inactive clients", async () => {
+    const { request } = setupActionTest({
+      attendanceClient: {
+        id: testClientId,
+        school_id: "school-1",
+        token_hash: testTokenHash,
+        active: false,
+        default_classroom_id: "classroom-1",
+        owner_teacher_id: null,
+      },
+    });
+
+    const response = await action(createActionArgs(request));
+
+    expect(response).toBeInstanceOf(Response);
+    expect((response as Response).status).toBe(403);
+    await expect((response as Response).json()).resolves.toEqual({
+      success: false,
+      studentName: "",
+      error: "Client is inactive",
+    });
   });
 });

@@ -1,3 +1,4 @@
+import { createHash, timingSafeEqual } from "node:crypto";
 import { PostgrestError } from "@supabase/supabase-js";
 import { DateTime } from "luxon";
 import type { Route } from "./+types/api";
@@ -5,11 +6,30 @@ import { createServiceRoleClient } from "~/lib/supabase/server";
 import { getCurrentPeriod, type PeriodScheduleEntry } from "~/utils/schedules";
 
 interface Body {
+  clientId: string;
   deviceID: string;
   rssi: number;
   deviceName: string;
   timestamp: string;
-  classroom: string;
+  classroom?: string;
+}
+
+function hashApiToken(token: string) {
+  return createHash("sha256").update(token).digest("hex");
+}
+
+function matchesApiToken(token: string | null, tokenHash: string) {
+  if (!token) {
+    return false;
+  }
+
+  const providedHash = Buffer.from(hashApiToken(token), "utf8");
+  const storedHash = Buffer.from(tokenHash, "utf8");
+
+  return (
+    providedHash.length === storedHash.length &&
+    timingSafeEqual(providedHash, storedHash)
+  );
 }
 
 function getDeviceApiToken(request: Request) {
@@ -23,30 +43,60 @@ function getDeviceApiToken(request: Request) {
 }
 
 export async function action({ request }: Route.ActionArgs) {
-  const configuredToken = process.env.DEVICE_API_TOKEN;
+  const token = getDeviceApiToken(request);
 
-  if (!configuredToken) {
+  if (!token) {
     return Response.json(
       {
         success: false,
         studentName: "",
-        error: "Device API is not configured",
+        error: "Unauthorized",
       },
-      { status: 500 },
-    );
-  }
-
-  if (getDeviceApiToken(request) !== configuredToken) {
-    return Response.json(
-      { success: false, studentName: "", error: "Unauthorized" },
       { status: 401 },
     );
   }
 
   const body = (await request.json()) as Body;
 
+  if (!body.clientId || !body.deviceID) {
+    return Response.json(
+      { success: false, studentName: "", error: "Invalid request" },
+      { status: 400 },
+    );
+  }
+
   const supabase = createServiceRoleClient();
   try {
+    const { data: attendanceClient, error: attendanceClientError } =
+      await supabase
+        .from("attendance_clients")
+        .select(
+          "id, school_id, token_hash, active, default_classroom_id, owner_teacher_id",
+        )
+        .eq("id", body.clientId)
+        .maybeSingle();
+
+    if (attendanceClientError || !attendanceClient) {
+      return Response.json(
+        { success: false, studentName: "", error: "Unauthorized" },
+        { status: 401 },
+      );
+    }
+
+    if (!matchesApiToken(token, attendanceClient.token_hash)) {
+      return Response.json(
+        { success: false, studentName: "", error: "Unauthorized" },
+        { status: 401 },
+      );
+    }
+
+    if (!attendanceClient.active) {
+      return Response.json(
+        { success: false, studentName: "", error: "Client is inactive" },
+        { status: 403 },
+      );
+    }
+
     const { data: studentInfo, error: studentError } = await supabase
       .from("students")
       .select(
@@ -62,8 +112,9 @@ export async function action({ request }: Route.ActionArgs) {
         )
       `,
       )
+      .eq("school_id", attendanceClient.school_id)
       .eq("device_id", body.deviceID)
-      .single();
+      .maybeSingle();
 
     if (studentError) throw studentError;
 
@@ -116,37 +167,56 @@ export async function action({ request }: Route.ActionArgs) {
     const { data: currentSessions, error: currentSessionsError } =
       await supabase
         .from("lecture_sessions")
-        .select("id, lecture_id, classroom_id, classroom:classroom_id(name)")
-        .eq("school_id", studentInfo.school.id)
+        .select("id, lecture_id, classroom_id, teacher_id")
+        .eq("school_id", attendanceClient.school_id)
         .eq("session_date", todayStr)
         .eq("period", currentPeriod);
 
     if (currentSessionsError) throw currentSessionsError;
 
-    const currentSession = (currentSessions ?? []).find((session) => {
-      const isEligible =
-        enrolledSessionIds.includes(session.id) ||
-        (session.lecture_id
-          ? enrolledLectureIds.includes(session.lecture_id)
-          : false);
+    const currentSessionsForClient = (currentSessions ?? []).filter(
+      (session) => {
+        const isEligible =
+          enrolledSessionIds.includes(session.id) ||
+          (session.lecture_id
+            ? enrolledLectureIds.includes(session.lecture_id)
+            : false);
 
-      if (!isEligible) {
-        return false;
-      }
+        if (!isEligible) {
+          return false;
+        }
 
-      return session.classroom?.name === body.classroom;
-    });
+        return (
+          session.classroom_id === attendanceClient.default_classroom_id ||
+          session.teacher_id === attendanceClient.owner_teacher_id
+        );
+      },
+    );
+
+    if (currentSessionsForClient.length !== 1) {
+      return { success: false, studentName: studentInfo.name };
+    }
+
+    const [currentSession] = currentSessionsForClient;
 
     if (!currentSession?.id || !currentSession.classroom_id) {
       return { success: false, studentName: studentInfo.name };
     }
 
-    const { error: updateError } = await supabase
-      .from("students")
-      .update({ last_detected_place: currentSession.classroom_id })
-      .match({ id: studentInfo.id });
+    const [{ error: updateError }, { error: attendanceClientUpdateError }] =
+      await Promise.all([
+        supabase
+          .from("students")
+          .update({ last_detected_place: currentSession.classroom_id })
+          .match({ id: studentInfo.id }),
+        supabase
+          .from("attendance_clients")
+          .update({ last_seen_at: new Date().toISOString() })
+          .match({ id: attendanceClient.id }),
+      ]);
 
     if (updateError) throw updateError;
+    if (attendanceClientUpdateError) throw attendanceClientUpdateError;
 
     const { error: attendanceError } = await supabase
       .from("attendances")
