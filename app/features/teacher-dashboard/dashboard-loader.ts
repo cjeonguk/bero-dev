@@ -85,6 +85,33 @@ async function getDashboardUserId({
   return user.id;
 }
 
+async function getDashboardTeacherActor({
+  supabase,
+  userId,
+}: {
+  supabase: DashboardSupabaseClient;
+  userId: string;
+}): Promise<{ id: string; school_id: string }> {
+  const { data: teacher, error } = await supabase
+    .from("teachers")
+    .select("school_id, id")
+    .eq("user_id", userId)
+    .single();
+
+  if (error) {
+    throw new Error("account is not a teacher");
+  }
+
+  if (!teacher?.school_id) {
+    throw new Error("teacher is missing school");
+  }
+
+  return {
+    id: teacher.id,
+    school_id: teacher.school_id,
+  };
+}
+
 function getSelectedDateContext(request: Request) {
   const now = DateTime.now().setZone("Asia/Seoul");
   const today = now.toFormat("yyyy-MM-dd");
@@ -138,6 +165,13 @@ function resolveCurrentLectureFromSession({
   } satisfies DashboardLecture;
 }
 
+function compareStudentNumbers(leftNum: string, rightNum: string) {
+  return leftNum.localeCompare(rightNum, "ko-KR", {
+    numeric: true,
+    sensitivity: "base",
+  });
+}
+
 export async function loadTeacherDashboardShellData({
   request,
   sessionId,
@@ -157,21 +191,12 @@ export async function loadTeacherDashboardShellData({
     supabase: dashboardSupabase,
     userId,
   });
+  const teacher = await getDashboardTeacherActor({
+    supabase: dashboardSupabase,
+    userId: teacherUserId,
+  });
   const { now, today, selectedDate, dateLabel, weekdayLabel } =
     getSelectedDateContext(request);
-
-  const { data: teacher, error } = await dashboardSupabase
-    .from("teachers")
-    .select("school_id, id")
-    .eq("user_id", teacherUserId)
-    .single();
-  if (error) {
-    throw new Error("account is not a teacher");
-  }
-
-  if (!teacher?.school_id) {
-    throw new Error("teacher is missing school");
-  }
 
   const { data: semester, error: getSemesterError } = await dashboardSupabase
     .from("semester_schedules")
@@ -271,9 +296,13 @@ export async function loadTeacherDashboardLectureDetailData({
     request,
     supabase,
   });
-  await getDashboardUserId({
+  const teacherUserId = await getDashboardUserId({
     supabase: dashboardSupabase,
     userId,
+  });
+  const teacher = await getDashboardTeacherActor({
+    supabase: dashboardSupabase,
+    userId: teacherUserId,
   });
 
   const { selectedDateTime } = getSelectedDateContext(request);
@@ -289,7 +318,7 @@ export async function loadTeacherDashboardLectureDetailData({
     await dashboardSupabase
       .from("lecture_sessions")
       .select(
-        "id, lecture_id, semester_id, name, module, period, kind, session_date",
+        "id, lecture_id, semester_id, name, module, period, kind, session_date, teacher_id, school_id",
       )
       .eq("id", sessionId)
       .maybeSingle();
@@ -297,12 +326,16 @@ export async function loadTeacherDashboardLectureDetailData({
     throw new Error("error in retrieving lecture session");
   }
 
+  const isOwnedLectureSession =
+    lectureSession?.teacher_id === teacher.id &&
+    lectureSession.school_id === teacher.school_id;
+
   const currentLecture = resolveCurrentLectureFromSession({
     session: lectureSession,
     selectedDateTime,
   });
 
-  if (!currentLecture?.sessionId || !lectureSession) {
+  if (!currentLecture?.sessionId || !lectureSession || !isOwnedLectureSession) {
     return {
       currentLecture: undefined,
       students: [],
@@ -353,7 +386,8 @@ export async function loadTeacherDashboardLectureDetailData({
         name: attendance.student.name,
         num: attendance.student.num,
         attendance: attendance.status,
-      })),
+      }))
+      .sort((left, right) => compareStudentNumbers(left.num, right.num)),
     viewState: "active-lecture",
   } satisfies TeacherDashboardLectureDetailLoaderData;
 }

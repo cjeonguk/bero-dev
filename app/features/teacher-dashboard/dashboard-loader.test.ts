@@ -123,27 +123,56 @@ function setupShellClient() {
   return { supabase };
 }
 
-function setupDetailClient() {
+function setupDetailClient(options?: {
+  lectureSession?: {
+    id: string;
+    lecture_id: string | null;
+    semester_id: number | null;
+    name: string;
+    module: string | null;
+    period: number;
+    kind: "regular" | "makeup" | "special";
+    session_date: string;
+    teacher_id?: string;
+    school_id?: string;
+  };
+}) {
   const authClient = createAuthClient();
+  const lectureSession = options?.lectureSession ?? {
+    id: "session-2",
+    lecture_id: "lecture-2",
+    semester_id: 1,
+    name: "Biology",
+    module: "Science",
+    period: 4,
+    kind: "regular" as const,
+    session_date: "2026-07-03",
+    teacher_id: "teacher-1",
+    school_id: "school-1",
+  };
 
   const supabase = {
     ...authClient,
     from: vi.fn((table: string) => {
+      if (table === "teachers") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              single: vi.fn().mockResolvedValue({
+                data: { id: "teacher-1", school_id: "school-1" },
+                error: null,
+              }),
+            })),
+          })),
+        };
+      }
+
       if (table === "lecture_sessions") {
         return {
           select: vi.fn(() => ({
             eq: vi.fn(() => ({
               maybeSingle: vi.fn().mockResolvedValue({
-                data: {
-                  id: "session-2",
-                  lecture_id: "lecture-2",
-                  semester_id: 1,
-                  name: "Biology",
-                  module: "Science",
-                  period: 4,
-                  kind: "regular",
-                  session_date: "2026-07-03",
-                },
+                data: lectureSession,
                 error: null,
               }),
             })),
@@ -157,14 +186,14 @@ function setupDetailClient() {
             eq: vi.fn().mockResolvedValue({
               data: [
                 {
-                  student_id: "student-1",
-                  status: "absent",
-                  student: { id: "student-1", name: "Kim", num: "1" },
+                  student_id: "student-10",
+                  status: "present",
+                  student: { id: "student-10", name: "Lee", num: "10" },
                 },
                 {
                   student_id: "student-2",
-                  status: "present",
-                  student: { id: "student-2", name: "Lee", num: "2" },
+                  status: "absent",
+                  student: { id: "student-2", name: "Kim", num: "2" },
                 },
               ],
               error: null,
@@ -189,6 +218,19 @@ function setupSpecialDetailClient() {
   const supabase = {
     ...authClient,
     from: vi.fn((table: string) => {
+      if (table === "teachers") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              single: vi.fn().mockResolvedValue({
+                data: { id: "teacher-1", school_id: "school-1" },
+                error: null,
+              }),
+            })),
+          })),
+        };
+      }
+
       if (table === "lecture_sessions") {
         return {
           select: vi.fn(() => ({
@@ -203,6 +245,8 @@ function setupSpecialDetailClient() {
                   period: 2,
                   kind: "special",
                   session_date: "2026-07-03",
+                  teacher_id: "teacher-1",
+                  school_id: "school-1",
                 },
                 error: null,
               }),
@@ -319,10 +363,43 @@ describe("teacher dashboard loader helpers", () => {
         period: 4,
       },
       students: [
-        { id: "student-1", name: "Kim", num: "1", attendance: "absent" },
-        { id: "student-2", name: "Lee", num: "2", attendance: "present" },
+        { id: "student-2", name: "Kim", num: "2", attendance: "absent" },
+        {
+          id: "student-10",
+          name: "Lee",
+          num: "10",
+          attendance: "present",
+        },
       ],
       viewState: "active-lecture",
+    });
+  });
+
+  it("does not load lecture detail for a session owned by another teacher", async () => {
+    setupDetailClient({
+      lectureSession: {
+        id: "session-2",
+        lecture_id: "lecture-2",
+        semester_id: 1,
+        name: "Biology",
+        module: "Science",
+        period: 4,
+        kind: "regular",
+        session_date: "2026-07-03",
+        teacher_id: "teacher-2",
+        school_id: "school-2",
+      },
+    });
+
+    await expect(
+      loadTeacherDashboardLectureDetailData({
+        request: createRequest(),
+        sessionId: "session-2",
+      }),
+    ).resolves.toMatchObject({
+      currentLecture: undefined,
+      students: [],
+      viewState: "no-selection",
     });
   });
 

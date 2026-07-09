@@ -1,4 +1,7 @@
+import { useEffect, useState } from "react";
+import { useFetcher } from "react-router";
 import type { Database } from "~/types/database.types";
+import type { DashboardAttendanceActionResult } from "~/features/teacher-dashboard/dashboard-actions";
 import type {
   DashboardLecture,
   DashboardStudentAttendance,
@@ -20,8 +23,30 @@ import {
   EmptyHeader,
   EmptyTitle,
 } from "~/components/ui/empty";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "~/components/ui/dialog";
 import { Separator } from "~/components/ui/separator";
 import { cn } from "~/lib/utils";
+
+const attendanceOptions = [
+  { value: "present", label: "출석" },
+  { value: "absent", label: "결석" },
+  { value: "late", label: "지각" },
+  { value: "excused", label: "공결" },
+  { value: "sick leave", label: "병결" },
+] satisfies Array<{
+  value: Database["public"]["Enums"]["attendance_status"];
+  label: string;
+}>;
+
+const attendanceFieldClassName =
+  "w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50";
 
 export function LectureAttendancePanel({
   viewState,
@@ -32,10 +57,31 @@ export function LectureAttendancePanel({
   currentLecture: DashboardLecture | undefined;
   students: DashboardStudentAttendance[];
 }) {
+  const fetcher = useFetcher<DashboardAttendanceActionResult>();
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const presentCount = students.filter(
     (student) => student.attendance === "present",
   ).length;
   const emptyState = getDashboardEmptyState(viewState);
+  const isSaving = fetcher.state !== "idle";
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      setIsEditDialogOpen(false);
+    }, 0);
+
+    return () => clearTimeout(timeoutId);
+  }, [currentLecture?.sessionId]);
+
+  useEffect(() => {
+    if (fetcher.data?.ok && fetcher.data.intent === "update-attendances") {
+      const timeoutId = setTimeout(() => {
+        setIsEditDialogOpen(false);
+      }, 0);
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [fetcher.data]);
 
   if (viewState !== "active-lecture") {
     return (
@@ -61,7 +107,13 @@ export function LectureAttendancePanel({
           {currentLecture?.period}교시 수업
         </CardDescription>
         <CardAction className="flex flex-col items-end gap-2">
-          <Button type="button" variant="outline" size="sm">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setIsEditDialogOpen(true)}
+            disabled={students.length === 0}
+          >
             수정
           </Button>
           <p className="pr-3.5 text-sm text-muted-foreground">
@@ -112,7 +164,69 @@ export function LectureAttendancePanel({
           </div>
         )}
       </CardContent>
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>학생 출석 상태 수정</DialogTitle>
+            <DialogDescription>
+              학생별 출석 상태를 변경한 뒤 저장해 주세요.
+            </DialogDescription>
+          </DialogHeader>
+          <fetcher.Form method="post" className="grid gap-4">
+            <input type="hidden" name="intent" value="update-attendances" />
+            <AttendanceEditFields students={students} />
+            {fetcher.data && !fetcher.data.ok ? (
+              <p className="text-sm text-destructive">{fetcher.data.message}</p>
+            ) : null}
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsEditDialogOpen(false)}
+                disabled={isSaving}
+              >
+                취소
+              </Button>
+              <Button type="submit" disabled={isSaving}>
+                {isSaving ? "저장 중..." : "저장"}
+              </Button>
+            </DialogFooter>
+          </fetcher.Form>
+        </DialogContent>
+      </Dialog>
     </Card>
+  );
+}
+
+export function AttendanceEditFields({
+  students,
+}: {
+  students: DashboardStudentAttendance[];
+}) {
+  return (
+    <div className="grid max-h-[50vh] gap-3 overflow-y-auto pr-1">
+      {students.map((student) => (
+        <label
+          key={student.id}
+          className="grid gap-2 rounded-xl border border-border/60 p-3"
+        >
+          <span className="text-sm font-medium">
+            {student.num}번 {student.name}
+          </span>
+          <select
+            name={`attendance:${student.id}`}
+            defaultValue={student.attendance}
+            className={attendanceFieldClassName}
+          >
+            {attendanceOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      ))}
+    </div>
   );
 }
 
@@ -141,9 +255,13 @@ function getDashboardEmptyState(viewState: DashboardViewState) {
 function getAttendancePresentation(
   attendance: Database["public"]["Enums"]["attendance_status"],
 ) {
+  const matchedOption = attendanceOptions.find(
+    (option) => option.value === attendance,
+  );
+
   if (attendance === "present") {
     return {
-      label: "출석",
+      label: matchedOption?.label ?? "출석",
       badgeVariant: "default" as const,
       cardClassName: "border-primary/30 bg-primary/5",
     };
@@ -151,7 +269,7 @@ function getAttendancePresentation(
 
   if (attendance === "absent") {
     return {
-      label: "결석",
+      label: matchedOption?.label ?? "결석",
       badgeVariant: "destructive" as const,
       cardClassName: "border-destructive/30 bg-destructive/5",
     };
@@ -159,7 +277,7 @@ function getAttendancePresentation(
 
   if (attendance === "late") {
     return {
-      label: "지각",
+      label: matchedOption?.label ?? "지각",
       badgeVariant: "secondary" as const,
       cardClassName: "border-border bg-muted/40",
     };
@@ -167,14 +285,14 @@ function getAttendancePresentation(
 
   if (attendance === "excused") {
     return {
-      label: "공결",
+      label: matchedOption?.label ?? "공결",
       badgeVariant: "secondary" as const,
       cardClassName: "border-border bg-muted/40",
     };
   }
 
   return {
-    label: "병결",
+    label: matchedOption?.label ?? "병결",
     badgeVariant: "secondary" as const,
     cardClassName: "border-border bg-muted/40",
   };
