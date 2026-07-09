@@ -275,7 +275,13 @@ export async function handleTeacherSettingsAction({
       throw error;
     }
 
-    return { ok: true, message: "클라이언트를 등록했습니다.", intent, token };
+    return {
+      ok: true,
+      message: "클라이언트를 등록했습니다.",
+      intent,
+      clientId: client.id,
+      token,
+    };
   }
 
   if (intent === "create-classroom-client") {
@@ -307,7 +313,13 @@ export async function handleTeacherSettingsAction({
       throw error;
     }
 
-    return { ok: true, message: "클라이언트를 등록했습니다.", intent, token };
+    return {
+      ok: true,
+      message: "클라이언트를 등록했습니다.",
+      intent,
+      clientId: client.id,
+      token,
+    };
   }
 
   if (

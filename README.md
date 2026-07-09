@@ -40,10 +40,18 @@ Create `.env.local`:
 VITE_SUPABASE_URL=your_supabase_url
 VITE_SUPABASE_PUBLISHABLE_OR_ANON_KEY=your_supabase_anon_key
 SUPABASE_SERVICE_ROLE_KEY=your_server_only_service_role_key
-DEVICE_API_TOKEN=your_device_api_bearer_token
 ```
 
-`SUPABASE_SERVICE_ROLE_KEY` and `DEVICE_API_TOKEN` are server-only values. Do not expose them in browser code.
+`SUPABASE_SERVICE_ROLE_KEY` is a server-only value. Do not expose it in browser code.
+
+### Device API authentication
+
+`POST /api` requires two client-specific credentials created in the settings screen:
+
+- `clientID`: include it in the JSON body as `clientID`
+- `token`: include it as `Authorization: Bearer <token>` or `x-device-api-token`
+
+Each attendance client has its own token. The raw token is shown only once when the client is created, while the `clientID` remains visible in the client management UI.
 
 ### Run locally
 

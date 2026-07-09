@@ -52,6 +52,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "~/components/ui/dialog";
+import { CopyIcon } from "lucide-react";
 import { createServiceRoleClient, createClient } from "~/lib/supabase/server";
 import { handleTeacherSettingsAction } from "~/features/teacher-settings/settings-actions";
 import { loadTeacherSettingsData } from "~/features/teacher-settings/settings-loader";
@@ -102,6 +103,11 @@ const adminSections: SettingsSection[] = [
   { id: "admin-teachers", label: "선생님 관리", adminOnly: true },
   { id: "admin-attendance", label: "공결 / 병결 처리", adminOnly: true },
 ];
+
+async function copyToClipboard(value: string, successMessage: string) {
+  await navigator.clipboard.writeText(value);
+  toast.success(successMessage);
+}
 
 export async function loader({ request }: Route.LoaderArgs) {
   const { supabase, headers } = createClient(request);
@@ -179,6 +185,8 @@ export default function TeacherSettings({ loaderData }: Route.ComponentProps) {
   });
   const token =
     actionData && "token" in actionData ? actionData.token : undefined;
+  const clientId =
+    actionData && "clientId" in actionData ? actionData.clientId : undefined;
   const visibleToken = token && token !== dismissedToken ? token : undefined;
 
   useEffect(() => {
@@ -237,8 +245,9 @@ export default function TeacherSettings({ loaderData }: Route.ComponentProps) {
           />
         </div>
       </div>
-      <TokenDialog
+      <ClientCredentialsDialog
         open={Boolean(visibleToken)}
+        clientId={clientId ?? ""}
         token={visibleToken ?? ""}
         onOpenChange={(open) =>
           setDismissedToken(open ? null : (visibleToken ?? null))
@@ -633,7 +642,7 @@ function ClientsSection({
   return (
     <SectionCard
       title="클라이언트 등록"
-      description="등록한 클라이언트를 관리합니다."
+      description="등록한 클라이언트를 관리합니다. /api 연동에는 clientID와 Bearer token이 모두 필요합니다."
     >
       <div className="flex flex-col gap-6">
         <Form
@@ -656,7 +665,7 @@ function ClientsSection({
           </div>
         </Form>
 
-        <div className="grid gap-3 lg:grid-cols-2">
+        <div className="grid gap-3">
           {loaderData.myClients.map((client) => (
             <ClientCard key={client.id} client={client} />
           ))}
@@ -680,7 +689,7 @@ function AdminClientsSection({
   return (
     <SectionCard
       title="학교 관리자 설정 · 교실 클라이언트"
-      description="교실 클라이언트를 등록하고 비활성화합니다."
+      description="교실 클라이언트를 등록하고 비활성화합니다. /api 연동에는 clientID와 Bearer token이 모두 필요합니다."
     >
       <div className="flex flex-col gap-4">
         <Form
@@ -1672,8 +1681,8 @@ function ClientCard({
   };
 }) {
   return (
-    <div className="flex items-center justify-between rounded-xl border border-border/60 p-3">
-      <div>
+    <div className="flex items-center justify-between gap-4 rounded-xl border border-border/60 p-3">
+      <div className="min-w-0">
         <p className="text-sm font-medium">{client.name}</p>
         <p className="text-xs text-muted-foreground">
           {client.clientType === "teacher" ? "선생님용" : "교실용"} ·{" "}
@@ -1685,6 +1694,17 @@ function ClientCard({
               : ""}
           {client.lastSeenAt ? ` · 마지막 연결 ${client.lastSeenAt}` : ""}
         </p>
+        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+          <span className="text-muted-foreground">clientID</span>
+          <div className="inline-flex max-w-full items-center gap-1 rounded bg-muted/40 px-2 py-1">
+            <code className="font-mono break-all">{client.id}</code>
+            <CopyIconButton
+              value={client.id}
+              successMessage="clientID를 복사했습니다."
+              ariaLabel="clientID 복사"
+            />
+          </div>
+        </div>
       </div>
       <div className="flex items-center gap-2">
         <Form method="post">
@@ -1712,34 +1732,62 @@ function DeleteClientButton({
   clientName: string;
 }) {
   const submit = useSubmit();
+  const [open, setOpen] = useState(false);
 
   return (
-    <Button
-      type="button"
-      variant="destructive"
-      size="sm"
-      onClick={() => {
-        if (!window.confirm(`${clientName} 클라이언트를 완전히 삭제할까요?`)) {
-          return;
-        }
-
-        const formData = new FormData();
-        formData.set("intent", "delete-client");
-        formData.set("clientId", clientId);
-        submit(formData, { method: "post" });
-      }}
-    >
-      삭제
-    </Button>
+    <>
+      <Button
+        type="button"
+        variant="destructive"
+        size="sm"
+        onClick={() => setOpen(true)}
+      >
+        삭제
+      </Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>클라이언트를 삭제할까요?</DialogTitle>
+            <DialogDescription>
+              {clientName} 클라이언트를 삭제하면 되돌릴 수 없습니다.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setOpen(false)}
+            >
+              취소
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => {
+                const formData = new FormData();
+                formData.set("intent", "delete-client");
+                formData.set("clientId", clientId);
+                submit(formData, { method: "post" });
+                setOpen(false);
+              }}
+            >
+              삭제
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
-function TokenDialog({
+function ClientCredentialsDialog({
   open,
+  clientId,
   token,
   onOpenChange,
 }: {
   open: boolean;
+  clientId: string;
   token: string;
   onOpenChange: (open: boolean) => void;
 }) {
@@ -1747,32 +1795,86 @@ function TokenDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>클라이언트 토큰 발급 완료</DialogTitle>
+          <DialogTitle>클라이언트 연동 정보 발급 완료</DialogTitle>
           <DialogDescription>
-            이 토큰은 지금만 확인할 수 있습니다. 복사해서 안전한 곳에 보관해
+            <code>clientID</code>는 언제든 다시 확인할 수 있지만, 이 토큰은
+            지금만 확인할 수 있습니다. 두 값을 모두 복사해서 안전한 곳에 보관해
             주세요.
           </DialogDescription>
         </DialogHeader>
-        <div className="rounded-2xl border border-border bg-muted/30 px-4 py-3 font-mono text-sm break-all">
-          {token}
+        <div className="grid gap-4">
+          <CredentialField
+            label="clientID"
+            value={clientId}
+            ariaLabel="clientID 복사"
+            successMessage="clientID를 복사했습니다."
+          />
+          <CredentialField
+            label="Bearer token"
+            value={token}
+            ariaLabel="토큰 복사"
+            successMessage="토큰을 복사했습니다."
+          />
         </div>
         <DialogFooter>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={async () => {
-              await navigator.clipboard.writeText(token);
-              toast.success("토큰을 복사했습니다.");
-            }}
-          >
-            복사
-          </Button>
           <Button type="button" onClick={() => onOpenChange(false)}>
             닫기
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function CredentialField({
+  label,
+  value,
+  ariaLabel,
+  successMessage,
+}: {
+  label: string;
+  value: string;
+  ariaLabel: string;
+  successMessage: string;
+}) {
+  return (
+    <div className="grid gap-2">
+      <span className="text-sm font-medium">{label}</span>
+      <div className="flex items-start gap-2 rounded-2xl border border-border bg-muted/30 px-4 py-3">
+        <code className="min-w-0 flex-1 font-mono text-sm break-all">
+          {value}
+        </code>
+        <CopyIconButton
+          value={value}
+          successMessage={successMessage}
+          ariaLabel={ariaLabel}
+        />
+      </div>
+    </div>
+  );
+}
+
+function CopyIconButton({
+  value,
+  successMessage,
+  ariaLabel,
+}: {
+  value: string;
+  successMessage: string;
+  ariaLabel: string;
+}) {
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon-xs"
+      className="text-muted-foreground hover:text-foreground"
+      aria-label={ariaLabel}
+      title={ariaLabel}
+      onClick={() => copyToClipboard(value, successMessage)}
+    >
+      <CopyIcon />
+    </Button>
   );
 }
 

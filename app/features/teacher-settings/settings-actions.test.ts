@@ -419,6 +419,7 @@ describe("handleTeacherSettingsAction", () => {
 
     expect(result).toMatchObject({
       ok: true,
+      clientId: "generated-id",
       token: "plain-text-token",
     });
     expect(inserts).toContainEqual({
@@ -443,7 +444,11 @@ describe("handleTeacherSettingsAction", () => {
       { actorIsAdmin: true },
     );
 
-    expect(result).toMatchObject({ ok: true, token: "plain-text-token" });
+    expect(result).toMatchObject({
+      ok: true,
+      clientId: "generated-id",
+      token: "plain-text-token",
+    });
     expect(inserts).toContainEqual({
       table: "attendance_clients",
       values: expect.objectContaining({
@@ -474,7 +479,11 @@ describe("handleTeacherSettingsAction", () => {
       { actorIsAdmin: true },
     );
 
-    expect(result).toMatchObject({ ok: true, token: "plain-text-token" });
+    expect(result).toMatchObject({
+      ok: true,
+      clientId: "generated-id-2",
+      token: "plain-text-token",
+    });
     expect(inserts).toContainEqual({
       table: "classrooms",
       values: {
@@ -514,7 +523,11 @@ describe("handleTeacherSettingsAction", () => {
       },
     );
 
-    expect(result).toMatchObject({ ok: true, token: "plain-text-token" });
+    expect(result).toMatchObject({
+      ok: true,
+      clientId: "generated-id-2",
+      token: "plain-text-token",
+    });
     expect(inserts).toContainEqual({
       table: "attendance_clients",
       values: expect.objectContaining({
@@ -545,7 +558,11 @@ describe("handleTeacherSettingsAction", () => {
       { actorIsAdmin: true },
     );
 
-    expect(result).toMatchObject({ ok: true, token: "plain-text-token" });
+    expect(result).toMatchObject({
+      ok: true,
+      clientId: "generated-id",
+      token: "plain-text-token",
+    });
     expect(inserts).toContainEqual({
       table: "attendance_clients",
       values: expect.objectContaining({

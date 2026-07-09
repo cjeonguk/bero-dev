@@ -85,6 +85,7 @@ export type TeacherSettingsActionResult = {
   ok: boolean;
   message: string;
   intent?: string;
+  clientId?: string;
   token?: string;
 };
 
