@@ -21,15 +21,19 @@ import {
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "~/components/ui/select";
+import { Textarea } from "~/components/ui/textarea";
+import {
   getDateNavigationHref,
   getSessionSelectionHref,
   isSessionSelectionActive,
 } from "./schedule-sidebar.helpers";
-
-const fieldClassName =
-  "w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50";
-
-const textareaClassName = `${fieldClassName} min-h-24 resize-y`;
 
 export function ScheduleSidebar({
   schedule,
@@ -224,14 +228,11 @@ function CreateManualSessionDialog({
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="grid gap-2">
               <Label htmlFor="manual-session-kind">구분</Label>
-              <select
-                id="manual-session-kind"
+              <Select
                 name="kind"
-                className={fieldClassName}
                 value={kind}
-                onChange={(event) => {
-                  const nextKind =
-                    event.target.value === "special" ? "special" : "makeup";
+                onValueChange={(value) => {
+                  const nextKind = value === "special" ? "special" : "makeup";
                   setKind(nextKind);
                   if (nextKind === "special" && !isNameDirty) {
                     setName("");
@@ -241,9 +242,20 @@ function CreateManualSessionDialog({
                   }
                 }}
               >
-                <option value="makeup">보강</option>
-                <option value="special">특강</option>
-              </select>
+                <SelectTrigger
+                  id="manual-session-kind"
+                  className="w-full"
+                  aria-label="구분"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent position="popper">
+                  <SelectGroup>
+                    <SelectItem value="makeup">보강</SelectItem>
+                    <SelectItem value="special">특강</SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
             </label>
 
             <div className="grid gap-2">
@@ -259,13 +271,10 @@ function CreateManualSessionDialog({
           {kind === "makeup" ? (
             <label className="grid gap-2">
               <Label htmlFor="manual-session-source-lecture">원본 수업</Label>
-              <select
-                id="manual-session-source-lecture"
+              <Select
                 name="sourceLectureId"
-                className={fieldClassName}
                 value={selectedLectureId}
-                onChange={(event) => {
-                  const nextLectureId = event.target.value;
+                onValueChange={(nextLectureId) => {
                   setSelectedLectureId(nextLectureId);
                   if (!isNameDirty) {
                     const nextLecture = teacherLectures.find(
@@ -275,17 +284,26 @@ function CreateManualSessionDialog({
                   }
                 }}
                 required
+                disabled={teacherLectures.length === 0}
               >
-                {teacherLectures.length === 0 ? (
-                  <option value="">등록 가능한 원본 수업이 없습니다</option>
-                ) : null}
-                {teacherLectures.map((lecture) => (
-                  <option key={lecture.id} value={lecture.id}>
-                    {lecture.name}
-                    {lecture.module ? ` (${lecture.module})` : ""}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger
+                  id="manual-session-source-lecture"
+                  className="w-full"
+                  aria-label="원본 수업"
+                >
+                  <SelectValue placeholder="등록 가능한 원본 수업이 없습니다" />
+                </SelectTrigger>
+                <SelectContent position="popper">
+                  <SelectGroup>
+                    {teacherLectures.map((lecture) => (
+                      <SelectItem key={lecture.id} value={lecture.id}>
+                        {lecture.name}
+                        {lecture.module ? ` (${lecture.module})` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
               <p className="text-sm text-muted-foreground">
                 원본 수업의 학생들은 보강 세션에 자동으로 등록됩니다.
               </p>
@@ -308,10 +326,10 @@ function CreateManualSessionDialog({
 
           <label className="grid gap-2">
             <Label htmlFor="manual-session-note">메모</Label>
-            <textarea
+            <Textarea
               id="manual-session-note"
               name="note"
-              className={textareaClassName}
+              className="resize-y"
               placeholder="필요한 메모가 있으면 입력해 주세요."
             />
           </label>

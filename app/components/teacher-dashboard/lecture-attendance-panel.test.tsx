@@ -16,11 +16,8 @@ describe("AttendanceEditFields", () => {
 
     expect(markup).toContain('name="attendance:student-1"');
     expect(markup).toContain('name="attendance:student-2"');
-    expect(markup).toContain("출석");
-    expect(markup).toContain("결석");
-    expect(markup).toContain("지각");
-    expect(markup).toContain("공결");
-    expect(markup).toContain("병결");
+    expect(markup).toContain('aria-label="Kim 출결 상태"');
+    expect(markup).toContain('aria-label="Lee 출결 상태"');
     expect(markup).toContain("1번 Kim");
     expect(markup).toContain("2번 Lee");
   });

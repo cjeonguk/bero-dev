@@ -1,8 +1,6 @@
 import { useId, useState, type KeyboardEvent } from "react";
 import type { DashboardClassroomOption } from "~/features/teacher-dashboard/dashboard";
-
-const fieldClassName =
-  "w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50";
+import { Input } from "~/components/ui/input";
 
 export function ClassroomAutocomplete({
   id,
@@ -88,11 +86,10 @@ export function ClassroomAutocomplete({
 
   return (
     <div className="relative">
-      <input
+      <Input
         id={id}
         name={name}
         value={query}
-        className={fieldClassName}
         placeholder={placeholder}
         autoComplete="off"
         role="combobox"

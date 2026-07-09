@@ -38,7 +38,16 @@ import {
 } from "~/components/ui/dialog";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "~/components/ui/select";
 import { Separator } from "~/components/ui/separator";
+import { Textarea } from "~/components/ui/textarea";
 import { cn } from "~/lib/utils";
 
 const attendanceOptions = [
@@ -51,9 +60,6 @@ const attendanceOptions = [
   value: Database["public"]["Enums"]["attendance_status"];
   label: string;
 }>;
-
-const attendanceFieldClassName =
-  "w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50";
 
 export function LectureAttendancePanel({
   viewState,
@@ -285,11 +291,10 @@ export function LectureAttendancePanel({
 
             <label className="grid gap-2">
               <Label htmlFor="session-note">메모</Label>
-              <textarea
+              <Textarea
                 id="session-note"
                 name="note"
                 defaultValue={currentLecture?.note ?? ""}
-                className={attendanceFieldClassName}
                 placeholder="필요한 메모가 있으면 입력해 주세요."
                 disabled={isSaving}
               />
@@ -389,18 +394,27 @@ export function AttendanceEditFields({
           <span className="text-sm font-medium">
             {student.num}번 {student.name}
           </span>
-          <select
+          <Select
             name={`attendance:${student.id}`}
             defaultValue={student.attendance}
-            className={attendanceFieldClassName}
             disabled={disabled}
           >
-            {attendanceOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger
+              className="w-full"
+              aria-label={`${student.name} 출결 상태`}
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent position="popper">
+              <SelectGroup>
+                {attendanceOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
         </label>
       ))}
     </div>

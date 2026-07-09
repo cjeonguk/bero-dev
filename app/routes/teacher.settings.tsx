@@ -33,8 +33,17 @@ import {
   EmptyHeader,
   EmptyTitle,
 } from "~/components/ui/empty";
+import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Separator } from "~/components/ui/separator";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "~/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -59,6 +68,8 @@ import {
 } from "~/features/teacher-settings/settings";
 import type { Route } from "./+types/teacher.settings";
 import { toast } from "sonner";
+
+const emptySelectValue = "__none__";
 
 type SettingsSectionId =
   | "profile"
@@ -527,13 +538,28 @@ function LecturesSection({
                         value={lecture.semesterId?.toString() ?? ""}
                       />
                       <Field label="추가할 학생">
-                        <select name="studentId" className={fieldClassName}>
-                          {availableStudents.map((student) => (
-                            <option key={student.id} value={student.id}>
-                              {student.num}번 {student.name} ({student.status})
-                            </option>
-                          ))}
-                        </select>
+                        <Select
+                          name="studentId"
+                          defaultValue={availableStudents[0]?.id}
+                          disabled={availableStudents.length === 0}
+                        >
+                          <SelectTrigger
+                            className="w-full"
+                            aria-label="추가할 학생"
+                          >
+                            <SelectValue placeholder="추가 가능한 학생이 없습니다." />
+                          </SelectTrigger>
+                          <SelectContent position="popper">
+                            <SelectGroup>
+                              {availableStudents.map((student) => (
+                                <SelectItem key={student.id} value={student.id}>
+                                  {student.num}번 {student.name} (
+                                  {student.status})
+                                </SelectItem>
+                              ))}
+                            </SelectGroup>
+                          </SelectContent>
+                        </Select>
                       </Field>
                       <div>
                         <Button
@@ -769,10 +795,9 @@ const ClassroomAutocomplete = forwardRef<
 
   return (
     <div className="relative">
-      <input
+      <Input
         name="defaultClassroomName"
         value={query}
-        className={fieldClassName}
         placeholder="예: Room A101"
         autoComplete="off"
         role="combobox"
@@ -900,16 +925,19 @@ function AdminStudentsSection({
                 </p>
               </div>
               <Field label="상태">
-                <select
-                  name="status"
-                  className={fieldClassName}
-                  defaultValue={student.status}
-                >
-                  <option value="active">재학</option>
-                  <option value="inactive">비활성</option>
-                  <option value="graduated">졸업</option>
-                  <option value="leave">휴학</option>
-                </select>
+                <Select name="status" defaultValue={student.status}>
+                  <SelectTrigger className="w-full" aria-label="상태">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent position="popper">
+                    <SelectGroup>
+                      <SelectItem value="active">재학</SelectItem>
+                      <SelectItem value="inactive">비활성</SelectItem>
+                      <SelectItem value="graduated">졸업</SelectItem>
+                      <SelectItem value="leave">휴학</SelectItem>
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
               </Field>
               <Button type="submit" variant="outline" disabled={isSubmitting}>
                 상태 저장
@@ -1040,23 +1068,39 @@ function AdminAttendanceSection({
         <input type="hidden" name="intent" value="mark-attendance" />
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="학생">
-            <select name="studentId" className={fieldClassName}>
-              {loaderData.admin?.students.map((student) => (
-                <option key={student.id} value={student.id}>
-                  {student.num}번 {student.name}
-                </option>
-              ))}
-            </select>
+            <Select
+              name="studentId"
+              defaultValue={loaderData.admin?.students[0]?.id}
+              disabled={
+                !loaderData.admin || loaderData.admin.students.length === 0
+              }
+            >
+              <SelectTrigger className="w-full" aria-label="학생">
+                <SelectValue placeholder="선택 가능한 학생이 없습니다." />
+              </SelectTrigger>
+              <SelectContent position="popper">
+                <SelectGroup>
+                  {loaderData.admin?.students.map((student) => (
+                    <SelectItem key={student.id} value={student.id}>
+                      {student.num}번 {student.name}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
           </Field>
           <Field label="출석 상태">
-            <select
-              name="status"
-              className={fieldClassName}
-              defaultValue="excused"
-            >
-              <option value="excused">공결</option>
-              <option value="sick leave">병결</option>
-            </select>
+            <Select name="status" defaultValue="excused">
+              <SelectTrigger className="w-full" aria-label="출석 상태">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent position="popper">
+                <SelectGroup>
+                  <SelectItem value="excused">공결</SelectItem>
+                  <SelectItem value="sick leave">병결</SelectItem>
+                </SelectGroup>
+              </SelectContent>
+            </Select>
           </Field>
           <div className="grid gap-4">
             <Field label="시작 날짜">
@@ -1127,6 +1171,10 @@ const LectureEditorForm = forwardRef<
   const [holidayRows, setHolidayRows] = useState(() =>
     createLectureHolidayDrafts(lecture?.holiday),
   );
+  const [semesterId, setSemesterId] = useState(
+    lecture?.semesterId?.toString() ?? "",
+  );
+  const [classroomId, setClassroomId] = useState(lecture?.classroomId ?? "");
   const scheduleJsonRef = useRef<HTMLInputElement>(null);
   const holidayJsonRef = useRef<HTMLInputElement>(null);
 
@@ -1135,6 +1183,8 @@ const LectureEditorForm = forwardRef<
       formRef.current?.reset();
       setScheduleRows(createLectureScheduleDrafts(lecture?.schedule));
       setHolidayRows(createLectureHolidayDrafts(lecture?.holiday));
+      setSemesterId(lecture?.semesterId?.toString() ?? "");
+      setClassroomId(lecture?.classroomId ?? "");
 
       if (scheduleJsonRef.current) {
         scheduleJsonRef.current.value = JSON.stringify(lecture?.schedule ?? []);
@@ -1209,32 +1259,50 @@ const LectureEditorForm = forwardRef<
         />
       </Field>
       <Field label="학기">
-        <select
-          name="semesterId"
-          className={fieldClassName}
-          defaultValue={lecture?.semesterId?.toString() ?? ""}
+        <input type="hidden" name="semesterId" value={semesterId} />
+        <Select
+          value={semesterId || emptySelectValue}
+          onValueChange={(value) => {
+            setSemesterId(value === emptySelectValue ? "" : value);
+          }}
         >
-          <option value="">선택 안 함</option>
-          {semesters.map((semester) => (
-            <option key={semester.id} value={semester.id}>
-              {semester.name}
-            </option>
-          ))}
-        </select>
+          <SelectTrigger className="w-full" aria-label="학기">
+            <SelectValue placeholder="선택 안 함" />
+          </SelectTrigger>
+          <SelectContent position="popper">
+            <SelectGroup>
+              <SelectItem value={emptySelectValue}>선택 안 함</SelectItem>
+              {semesters.map((semester) => (
+                <SelectItem key={semester.id} value={semester.id.toString()}>
+                  {semester.name}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
       </Field>
       <Field label="교실">
-        <select
-          name="classroomId"
-          className={fieldClassName}
-          defaultValue={lecture?.classroomId ?? ""}
+        <input type="hidden" name="classroomId" value={classroomId} />
+        <Select
+          value={classroomId || emptySelectValue}
+          onValueChange={(value) => {
+            setClassroomId(value === emptySelectValue ? "" : value);
+          }}
         >
-          <option value="">선택 안 함</option>
-          {classrooms.map((classroom) => (
-            <option key={classroom.id} value={classroom.id}>
-              {classroom.name}
-            </option>
-          ))}
-        </select>
+          <SelectTrigger className="w-full" aria-label="교실">
+            <SelectValue placeholder="선택 안 함" />
+          </SelectTrigger>
+          <SelectContent position="popper">
+            <SelectGroup>
+              <SelectItem value={emptySelectValue}>선택 안 함</SelectItem>
+              {classrooms.map((classroom) => (
+                <SelectItem key={classroom.id} value={classroom.id}>
+                  {classroom.name}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
       </Field>
       <Field label="수업 스케줄" className="lg:col-span-2">
         <div className="flex flex-col gap-3 rounded-xl border border-border/60 p-4">
@@ -1252,27 +1320,40 @@ const LectureEditorForm = forwardRef<
                   key={row.id}
                   className="grid gap-3 rounded-xl border border-border/60 p-3 sm:grid-cols-[minmax(0,1fr)_120px_auto]"
                 >
-                  <select
-                    value={row.day}
-                    aria-label={`수업 스케줄 ${index + 1}행 요일`}
-                    className={fieldClassName}
-                    onChange={(event) => {
+                  <Select
+                    value={row.day || emptySelectValue}
+                    onValueChange={(value) => {
                       setScheduleRows((currentRows) =>
                         currentRows.map((currentRow) =>
                           currentRow.id === row.id
-                            ? { ...currentRow, day: event.target.value }
+                            ? {
+                                ...currentRow,
+                                day: value === emptySelectValue ? "" : value,
+                              }
                             : currentRow,
                         ),
                       );
                     }}
                   >
-                    <option value="">요일 선택</option>
-                    {lectureDays.map((day) => (
-                      <option key={day} value={day}>
-                        {lectureDayLabels[day]}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger
+                      className="w-full"
+                      aria-label={`수업 스케줄 ${index + 1}행 요일`}
+                    >
+                      <SelectValue placeholder="요일 선택" />
+                    </SelectTrigger>
+                    <SelectContent position="popper">
+                      <SelectGroup>
+                        <SelectItem value={emptySelectValue}>
+                          요일 선택
+                        </SelectItem>
+                        {lectureDays.map((day) => (
+                          <SelectItem key={day} value={day}>
+                            {lectureDayLabels[day]}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
                   <input
                     type="number"
                     min={1}
