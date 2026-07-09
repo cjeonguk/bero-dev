@@ -11,6 +11,19 @@ export type DashboardAttendanceActionResult = {
   intent: "update-attendances";
 };
 
+export type DashboardSessionUpdateActionResult = {
+  ok: boolean;
+  message: string;
+  intent: "update-session";
+};
+
+export type DashboardSessionDeleteActionResult = {
+  ok: boolean;
+  message: string;
+  intent: "delete-session";
+  redirectTo?: string;
+};
+
 export type DashboardSessionCreationActionResult = {
   ok: boolean;
   message: string;
@@ -21,6 +34,8 @@ export type DashboardSessionCreationActionResult = {
 
 export type TeacherDashboardActionResult =
   | DashboardAttendanceActionResult
+  | DashboardSessionUpdateActionResult
+  | DashboardSessionDeleteActionResult
   | DashboardSessionCreationActionResult;
 
 type AttendanceStatus = Database["public"]["Enums"]["attendance_status"];
@@ -112,7 +127,10 @@ async function getDashboardTeacherActor({
   };
 }
 
-function parseAttendanceUpdates(formData: FormData) {
+function parseAttendanceUpdates(
+  formData: FormData,
+  { allowEmpty = false }: { allowEmpty?: boolean } = {},
+) {
   const updates: Array<{ studentId: string; status: AttendanceStatus }> = [];
   let hasAttendanceField = false;
 
@@ -133,11 +151,62 @@ function parseAttendanceUpdates(formData: FormData) {
     updates.push({ studentId, status });
   }
 
-  if (!hasAttendanceField) {
+  if (!hasAttendanceField && !allowEmpty) {
     throw new Error("변경할 출석 정보가 없습니다.");
   }
 
   return updates;
+}
+
+function parseSessionUpdateInput(formData: FormData) {
+  return {
+    module: toOptionalString(formData.get("module")),
+    classroomName: toRequiredString(
+      formData.get("classroomName"),
+      "classroomName",
+    ),
+    note: toOptionalString(formData.get("note")),
+  };
+}
+
+async function loadOwnedLectureSession({
+  supabase,
+  userId,
+  sessionId,
+}: {
+  supabase: DashboardSupabaseClient;
+  userId: string;
+  sessionId?: string;
+}) {
+  if (!sessionId) {
+    throw new Error("session is required");
+  }
+
+  const teacher = await getDashboardTeacherActor({ supabase, userId });
+  const { data: lectureSession, error: lectureSessionError } = await supabase
+    .from("lecture_sessions")
+    .select(
+      "id, lecture_id, teacher_id, school_id, kind, session_date, period, classroom_id",
+    )
+    .eq("id", sessionId)
+    .maybeSingle();
+
+  if (lectureSessionError) {
+    throw lectureSessionError;
+  }
+
+  if (
+    !lectureSession?.id ||
+    lectureSession.teacher_id !== teacher.id ||
+    lectureSession.school_id !== teacher.school_id
+  ) {
+    throw new Error("session not found");
+  }
+
+  return {
+    teacher,
+    lectureSession,
+  };
 }
 
 function parseSelectedDate(value: FormDataEntryValue | null) {
@@ -259,28 +328,11 @@ async function handleAttendanceUpdate({
   userId: string;
   sessionId?: string;
 }): Promise<DashboardAttendanceActionResult> {
-  if (!sessionId) {
-    throw new Error("session is required");
-  }
-
-  const teacher = await getDashboardTeacherActor({ supabase, userId });
-  const { data: lectureSession, error: lectureSessionError } = await supabase
-    .from("lecture_sessions")
-    .select("id, lecture_id, teacher_id, school_id, kind")
-    .eq("id", sessionId)
-    .maybeSingle();
-
-  if (lectureSessionError) {
-    throw lectureSessionError;
-  }
-
-  if (
-    !lectureSession?.id ||
-    lectureSession.teacher_id !== teacher.id ||
-    lectureSession.school_id !== teacher.school_id
-  ) {
-    throw new Error("session not found");
-  }
+  const { lectureSession } = await loadOwnedLectureSession({
+    supabase,
+    userId,
+    sessionId,
+  });
 
   const updates = parseAttendanceUpdates(formData);
 
@@ -288,7 +340,7 @@ async function handleAttendanceUpdate({
     await supabase
       .from("attendances")
       .select("student_id")
-      .eq("lecture_session_id", sessionId);
+      .eq("lecture_session_id", lectureSession.id);
 
   if (sessionAttendancesError) {
     throw sessionAttendancesError;
@@ -307,7 +359,7 @@ async function handleAttendanceUpdate({
   await supabase.from("attendances").upsert(
     updates.map((update) => ({
       student_id: update.studentId,
-      lecture_session_id: sessionId,
+      lecture_session_id: lectureSession.id,
       status: update.status,
     })),
     { onConflict: "student_id,lecture_session_id" },
@@ -317,6 +369,170 @@ async function handleAttendanceUpdate({
     ok: true,
     message: `${updates.length}명의 출석 상태를 저장했습니다.`,
     intent: "update-attendances",
+  };
+}
+
+async function handleSessionUpdate({
+  formData,
+  supabase,
+  serviceRoleSupabase,
+  userId,
+  sessionId,
+}: {
+  formData: FormData;
+  supabase: DashboardSupabaseClient;
+  serviceRoleSupabase?: DashboardServiceRoleClient;
+  userId: string;
+  sessionId?: string;
+}): Promise<DashboardSessionUpdateActionResult> {
+  if (!serviceRoleSupabase) {
+    throw new Error("service role client is required");
+  }
+
+  const { teacher, lectureSession } = await loadOwnedLectureSession({
+    supabase,
+    userId,
+    sessionId,
+  });
+  const input = parseSessionUpdateInput(formData);
+  const attendanceUpdates = parseAttendanceUpdates(formData, {
+    allowEmpty: true,
+  });
+  const classroomId = await resolveClassroomId({
+    supabase: serviceRoleSupabase,
+    schoolId: teacher.school_id,
+    classroomName: input.classroomName,
+  });
+
+  if (classroomId !== lectureSession.classroom_id) {
+    const { data: conflictingSessions, error: conflictError } =
+      await serviceRoleSupabase
+        .from("lecture_sessions")
+        .select("id, teacher_id, classroom_id")
+        .eq("school_id", teacher.school_id)
+        .eq("session_date", lectureSession.session_date)
+        .eq("period", lectureSession.period);
+
+    if (conflictError) {
+      throw conflictError;
+    }
+
+    if (
+      (conflictingSessions ?? []).some(
+        (session) =>
+          session.id !== lectureSession.id &&
+          session.classroom_id === classroomId,
+      )
+    ) {
+      throw new Error("선택한 교실은 해당 날짜와 교시에 이미 사용 중입니다.");
+    }
+  }
+
+  const { error: updateLectureSessionError } = await serviceRoleSupabase
+    .from("lecture_sessions")
+    .update({
+      module: input.module ?? null,
+      classroom_id: classroomId,
+      note: input.note ?? null,
+    })
+    .eq("id", lectureSession.id);
+
+  if (updateLectureSessionError) {
+    throw updateLectureSessionError;
+  }
+
+  if (attendanceUpdates.length > 0) {
+    const { data: sessionAttendances, error: sessionAttendancesError } =
+      await supabase
+        .from("attendances")
+        .select("student_id")
+        .eq("lecture_session_id", lectureSession.id);
+
+    if (sessionAttendancesError) {
+      throw sessionAttendancesError;
+    }
+
+    const allowedStudentIds = new Set(
+      (sessionAttendances ?? [])
+        .map((attendance) => attendance.student_id)
+        .filter((studentId): studentId is string => Boolean(studentId)),
+    );
+
+    if (
+      attendanceUpdates.some(
+        (update) => !allowedStudentIds.has(update.studentId),
+      )
+    ) {
+      throw new Error("세션에 없는 학생의 출석은 수정할 수 없습니다.");
+    }
+
+    const { error: upsertAttendancesError } = await supabase
+      .from("attendances")
+      .upsert(
+        attendanceUpdates.map((update) => ({
+          student_id: update.studentId,
+          lecture_session_id: lectureSession.id,
+          status: update.status,
+        })),
+        { onConflict: "student_id,lecture_session_id" },
+      );
+
+    if (upsertAttendancesError) {
+      throw upsertAttendancesError;
+    }
+  }
+
+  return {
+    ok: true,
+    message: "세션 정보를 저장했습니다.",
+    intent: "update-session",
+  };
+}
+
+async function handleSessionDelete({
+  supabase,
+  serviceRoleSupabase,
+  userId,
+  sessionId,
+}: {
+  supabase: DashboardSupabaseClient;
+  serviceRoleSupabase?: DashboardServiceRoleClient;
+  userId: string;
+  sessionId?: string;
+}): Promise<DashboardSessionDeleteActionResult> {
+  if (!serviceRoleSupabase) {
+    throw new Error("service role client is required");
+  }
+
+  const { lectureSession } = await loadOwnedLectureSession({
+    supabase,
+    userId,
+    sessionId,
+  });
+
+  const { error: deleteAttendancesError } = await serviceRoleSupabase
+    .from("attendances")
+    .delete()
+    .eq("lecture_session_id", lectureSession.id);
+
+  if (deleteAttendancesError) {
+    throw deleteAttendancesError;
+  }
+
+  const { error: deleteLectureSessionError } = await serviceRoleSupabase
+    .from("lecture_sessions")
+    .delete()
+    .eq("id", lectureSession.id);
+
+  if (deleteLectureSessionError) {
+    throw deleteLectureSessionError;
+  }
+
+  return {
+    ok: true,
+    message: "세션을 삭제했습니다.",
+    intent: "delete-session",
+    redirectTo: `/teacher/dashboard?date=${lectureSession.session_date}`,
   };
 }
 
@@ -533,6 +749,25 @@ export async function handleTeacherDashboardAction({
     return handleAttendanceUpdate({
       formData,
       supabase,
+      userId,
+      sessionId,
+    });
+  }
+
+  if (intent === "update-session") {
+    return handleSessionUpdate({
+      formData,
+      supabase,
+      serviceRoleSupabase,
+      userId,
+      sessionId,
+    });
+  }
+
+  if (intent === "delete-session") {
+    return handleSessionDelete({
+      supabase,
+      serviceRoleSupabase,
       userId,
       sessionId,
     });

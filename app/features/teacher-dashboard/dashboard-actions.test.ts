@@ -9,6 +9,9 @@ type DashboardActionSupabaseOptions = {
     teacher_id: string;
     school_id: string;
     kind: "regular" | "makeup" | "special";
+    session_date: string;
+    period: number;
+    classroom_id: string;
   } | null;
   attendanceStudentIds?: string[];
   activeSemesterId?: number | null;
@@ -37,7 +40,22 @@ function createDashboardActionSupabase(
     values: unknown;
     options?: unknown;
   }> = [];
+  const attendanceDeletes: Array<{
+    table: string;
+    filters: Array<{ column: string; value: unknown }>;
+  }> = [];
   const sessionInserts: Array<{ table: string; values: unknown }> = [];
+  const sessionUpdates: Array<{
+    source: "dashboard" | "service-role";
+    table: string;
+    values: unknown;
+    filters: Array<{ column: string; value: unknown }>;
+  }> = [];
+  const sessionDeletes: Array<{
+    source: "dashboard" | "service-role";
+    table: string;
+    filters: Array<{ column: string; value: unknown }>;
+  }> = [];
   const actor = {
     id: "teacher-1",
     school_id: "school-1",
@@ -50,6 +68,9 @@ function createDashboardActionSupabase(
     teacher_id: "teacher-1",
     school_id: "school-1",
     kind: "regular" as const,
+    session_date: "2026-07-03",
+    period: 4,
+    classroom_id: "classroom-1",
   };
   const attendanceStudentIds = options.attendanceStudentIds ?? [
     "student-1",
@@ -95,6 +116,27 @@ function createDashboardActionSupabase(
               }),
             })),
           })),
+          update: vi.fn((values: unknown) => ({
+            eq: vi.fn((column: string, value: unknown) => {
+              sessionUpdates.push({
+                source: "dashboard",
+                table,
+                values,
+                filters: [{ column, value }],
+              });
+              return Promise.resolve({ error: null });
+            }),
+          })),
+          delete: vi.fn(() => ({
+            eq: vi.fn((column: string, value: unknown) => {
+              sessionDeletes.push({
+                source: "dashboard",
+                table,
+                filters: [{ column, value }],
+              });
+              return Promise.resolve({ error: null });
+            }),
+          })),
         };
       }
 
@@ -117,6 +159,15 @@ function createDashboardActionSupabase(
             });
             return Promise.resolve({ error: null });
           }),
+          delete: vi.fn(() => ({
+            eq: vi.fn((column: string, value: unknown) => {
+              attendanceDeletes.push({
+                table,
+                filters: [{ column, value }],
+              });
+              return Promise.resolve({ error: null });
+            }),
+          })),
         };
       }
 
@@ -221,6 +272,27 @@ function createDashboardActionSupabase(
               })),
             })),
           })),
+          update: vi.fn((values: unknown) => ({
+            eq: vi.fn((column: string, value: unknown) => {
+              sessionUpdates.push({
+                source: "service-role",
+                table,
+                values,
+                filters: [{ column, value }],
+              });
+              return Promise.resolve({ error: null });
+            }),
+          })),
+          delete: vi.fn(() => ({
+            eq: vi.fn((column: string, value: unknown) => {
+              sessionDeletes.push({
+                source: "service-role",
+                table,
+                filters: [{ column, value }],
+              });
+              return Promise.resolve({ error: null });
+            }),
+          })),
           insert: vi.fn((values: unknown) => {
             sessionInserts.push({ table, values });
             return {
@@ -246,6 +318,15 @@ function createDashboardActionSupabase(
             });
             return Promise.resolve({ error: null });
           }),
+          delete: vi.fn(() => ({
+            eq: vi.fn((column: string, value: unknown) => {
+              attendanceDeletes.push({
+                table,
+                filters: [{ column, value }],
+              });
+              return Promise.resolve({ error: null });
+            }),
+          })),
         };
       }
 
@@ -257,7 +338,10 @@ function createDashboardActionSupabase(
     supabase,
     serviceRoleSupabase,
     attendanceUpserts,
+    attendanceDeletes,
     sessionInserts,
+    sessionUpdates,
+    sessionDeletes,
   };
 }
 
@@ -462,6 +546,140 @@ describe("handleTeacherDashboardAction", () => {
         },
       ],
       options: { onConflict: "student_id,lecture_session_id" },
+    });
+  });
+
+  it("updates session fields and attendance states together", async () => {
+    const { result, sessionUpdates, attendanceUpserts } =
+      await submitDashboardAction({
+        form: new URLSearchParams({
+          intent: "update-session",
+          module: "Advanced Science",
+          classroomName: "Science Lab",
+          note: "현미경 지참",
+          "attendance:student-1": "present",
+          "attendance:student-2": "excused",
+        }),
+      });
+
+    expect(result).toEqual({
+      ok: true,
+      message: "세션 정보를 저장했습니다.",
+      intent: "update-session",
+    });
+    expect(sessionUpdates).toContainEqual({
+      source: "service-role",
+      table: "lecture_sessions",
+      values: {
+        module: "Advanced Science",
+        classroom_id: "classroom-1",
+        note: "현미경 지참",
+      },
+      filters: [{ column: "id", value: "session-2" }],
+    });
+    expect(attendanceUpserts).toContainEqual({
+      source: "dashboard",
+      table: "attendances",
+      values: [
+        {
+          student_id: "student-1",
+          lecture_session_id: "session-2",
+          status: "present",
+        },
+        {
+          student_id: "student-2",
+          lecture_session_id: "session-2",
+          status: "excused",
+        },
+      ],
+      options: { onConflict: "student_id,lecture_session_id" },
+    });
+  });
+
+  it("updates session fields even when there are no registered students", async () => {
+    const { result, sessionUpdates, attendanceUpserts } =
+      await submitDashboardAction({
+        form: new URLSearchParams({
+          intent: "update-session",
+          module: "Seminar",
+          classroomName: "Science Lab",
+          note: "학생 없음",
+        }),
+        options: { attendanceStudentIds: [] },
+      });
+
+    expect(result).toEqual({
+      ok: true,
+      message: "세션 정보를 저장했습니다.",
+      intent: "update-session",
+    });
+    expect(sessionUpdates).toContainEqual({
+      source: "service-role",
+      table: "lecture_sessions",
+      values: {
+        module: "Seminar",
+        classroom_id: "classroom-1",
+        note: "학생 없음",
+      },
+      filters: [{ column: "id", value: "session-2" }],
+    });
+    expect(attendanceUpserts).toHaveLength(0);
+  });
+
+  it("rejects a session update when the classroom is already in use", async () => {
+    await expect(
+      submitDashboardAction({
+        form: new URLSearchParams({
+          intent: "update-session",
+          module: "Science",
+          classroomName: "Science Lab",
+          note: "메모",
+        }),
+        options: {
+          lectureSession: {
+            id: "session-2",
+            lecture_id: "lecture-2",
+            teacher_id: "teacher-1",
+            school_id: "school-1",
+            kind: "regular",
+            session_date: "2026-07-03",
+            period: 4,
+            classroom_id: "classroom-9",
+          },
+          conflictingSessions: [
+            {
+              id: "session-conflict",
+              teacher_id: "teacher-2",
+              classroom_id: "classroom-1",
+            },
+          ],
+        },
+      }),
+    ).rejects.toThrow("선택한 교실은 해당 날짜와 교시에 이미 사용 중입니다.");
+  });
+
+  it("deletes the selected session and its attendances", async () => {
+    const { result, attendanceDeletes, sessionDeletes } =
+      await submitDashboardAction({
+        form: new URLSearchParams({
+          intent: "delete-session",
+        }),
+      });
+
+    expect(result).toEqual({
+      ok: true,
+      message: "세션을 삭제했습니다.",
+      intent: "delete-session",
+      redirectTo: "/teacher/dashboard?date=2026-07-03",
+    });
+    expect(attendanceDeletes).toContainEqual({
+      table: "attendances",
+      filters: [{ column: "lecture_session_id", value: "session-2" }],
+    });
+    expect(sessionDeletes).toContainEqual({
+      source: "service-role",
+      table: "lecture_sessions",
+      filters: [{ column: "id", value: "session-2" }],
     });
   });
 

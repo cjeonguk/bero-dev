@@ -146,6 +146,10 @@ function resolveCurrentLectureFromSession({
         lecture_id: string | null;
         name: string | null;
         module: string | null;
+        note: string | null;
+        classroom: {
+          name: string | null;
+        } | null;
         period: number;
         kind: Database["public"]["Enums"]["lecture_session_kind"];
         session_date: string;
@@ -166,6 +170,8 @@ function resolveCurrentLectureFromSession({
     lectureId: session.lecture_id,
     name: session.name ?? "-",
     module: session.module ?? undefined,
+    classroomName: session.classroom?.name ?? undefined,
+    note: session.note ?? undefined,
     period: session.period,
     kind: session.kind,
   } satisfies DashboardLecture;
@@ -245,7 +251,9 @@ export async function loadTeacherDashboardShellData({
   ] = await Promise.all([
     dashboardSupabase
       .from("lecture_sessions")
-      .select("id, lecture_id, name, module, period, kind")
+      .select(
+        "id, lecture_id, name, module, note, period, kind, classroom:classrooms!lecture_sessions_classroom_id_fkey(name)",
+      )
       .eq("teacher_id", teacher.id)
       .eq("session_date", selectedDate)
       .order("period", { ascending: true }),
@@ -331,6 +339,8 @@ export async function loadTeacherDashboardShellData({
       lectureId: session.lecture_id,
       name: session.name,
       module: session.module,
+      classroomName: session.classroom?.name ?? null,
+      note: session.note,
       period: session.period,
       kind: session.kind,
     })),
@@ -407,7 +417,7 @@ export async function loadTeacherDashboardLectureDetailData({
     await dashboardSupabase
       .from("lecture_sessions")
       .select(
-        "id, lecture_id, semester_id, name, module, period, kind, session_date, teacher_id, school_id",
+        "id, lecture_id, semester_id, name, module, note, period, kind, session_date, teacher_id, school_id, classroom:classrooms!lecture_sessions_classroom_id_fkey(name)",
       )
       .eq("id", sessionId)
       .maybeSingle();

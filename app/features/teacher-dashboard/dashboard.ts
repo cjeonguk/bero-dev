@@ -5,6 +5,8 @@ export type DashboardLecture = {
   lectureId?: string | null;
   name: string;
   module?: string;
+  classroomName?: string;
+  note?: string;
   period: number;
   kind?: Database["public"]["Enums"]["lecture_session_kind"];
 };
@@ -46,6 +48,8 @@ type SchedulableSession = {
   lectureId: string | null;
   name: string | null;
   module: string | null;
+  classroomName: string | null;
+  note: string | null;
   period: number;
   kind: Database["public"]["Enums"]["lecture_session_kind"];
 };
@@ -67,6 +71,8 @@ export function buildTodaySchedule({
       lectureId: session.lectureId,
       name: session.name ?? "-",
       module: session.module ?? undefined,
+      classroomName: session.classroomName ?? undefined,
+      note: session.note ?? undefined,
       period: session.period,
       kind: session.kind,
     });

@@ -70,4 +70,36 @@ describe("teacher dashboard index route", () => {
       }),
     ).toBe(true);
   });
+
+  it("revalidates the shell when navigating from a deleted lecture detail to the date index", () => {
+    expect(
+      shouldRevalidateTeacherDashboardShell({
+        currentUrl: new URL(
+          "https://example.com/teacher/dashboard/session-1?date=2026-07-03",
+        ),
+        nextUrl: new URL(
+          "https://example.com/teacher/dashboard?date=2026-07-03",
+        ),
+        formMethod: undefined,
+        actionResult: undefined,
+        defaultShouldRevalidate: true,
+      }),
+    ).toBe(true);
+  });
+
+  it("revalidates the shell when navigating from the date index to a lecture detail", () => {
+    expect(
+      shouldRevalidateTeacherDashboardShell({
+        currentUrl: new URL(
+          "https://example.com/teacher/dashboard?date=2026-07-03",
+        ),
+        nextUrl: new URL(
+          "https://example.com/teacher/dashboard/session-2?date=2026-07-03",
+        ),
+        formMethod: undefined,
+        actionResult: undefined,
+        defaultShouldRevalidate: true,
+      }),
+    ).toBe(true);
+  });
 });

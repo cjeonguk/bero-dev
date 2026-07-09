@@ -16,6 +16,13 @@ import {
 } from "~/features/teacher-dashboard/dashboard-loader";
 import { createServiceRoleClient, createClient } from "~/lib/supabase/server";
 
+async function getActionIntent(request: Request) {
+  const formData = await request.clone().formData();
+  const intent = formData.get("intent");
+
+  return typeof intent === "string" ? intent : undefined;
+}
+
 export type TeacherDashboardOutletContext = TeacherDashboardShellLoaderData;
 
 export function shouldRevalidateTeacherDashboardShell({
@@ -38,12 +45,18 @@ export function shouldRevalidateTeacherDashboardShell({
 
   const currentDate = currentUrl.searchParams.get("date");
   const nextDate = nextUrl.searchParams.get("date");
-  const dashboardPathChanged =
-    currentUrl.pathname.startsWith("/teacher/dashboard") &&
-    nextUrl.pathname.startsWith("/teacher/dashboard") &&
+  const currentPathSegments = currentUrl.pathname.split("/").filter(Boolean);
+  const nextPathSegments = nextUrl.pathname.split("/").filter(Boolean);
+  const isTeacherDashboardPath = (segments: string[]) =>
+    segments[0] === "teacher" && segments[1] === "dashboard";
+  const isTeacherDashboardDetailPath = (segments: string[]) =>
+    isTeacherDashboardPath(segments) && segments.length === 3;
+  const detailPathChanged =
+    isTeacherDashboardDetailPath(currentPathSegments) &&
+    isTeacherDashboardDetailPath(nextPathSegments) &&
     currentUrl.pathname !== nextUrl.pathname;
 
-  if (dashboardPathChanged && currentDate === nextDate) {
+  if (detailPathChanged && currentDate === nextDate) {
     return false;
   }
 
@@ -55,8 +68,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 }
 
 export async function action({ request }: Route.ActionArgs) {
-  const formData = await request.clone().formData();
-  const intent = formData.get("intent");
+  const intent = await getActionIntent(request);
   const { supabase, headers } = createClient(request);
   const {
     data: { user },
@@ -83,7 +95,7 @@ export async function action({ request }: Route.ActionArgs) {
         message:
           error instanceof Error
             ? error.message
-            : "세션 등록 중 오류가 발생했습니다.",
+            : "세션 처리 중 오류가 발생했습니다.",
         intent:
           intent === "create-manual-session"
             ? "create-manual-session"

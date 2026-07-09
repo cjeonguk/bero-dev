@@ -31,6 +31,7 @@ export default function TeacherDashboardIndex() {
     <TeacherDashboardPanel
       loaderData={{
         currentLecture: loaderData.currentLecture,
+        classrooms: loaderData.classrooms,
         students: [],
         viewState: loaderData.viewState,
       }}

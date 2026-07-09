@@ -99,6 +99,8 @@ function setupShellClient() {
                       lecture_id: "lecture-2",
                       name: "Biology",
                       module: "Science",
+                      note: "실험복 준비",
+                      classroom: { name: "Science Lab" },
                       period: 4,
                       kind: "regular",
                     },
@@ -185,6 +187,8 @@ function setupDetailClient(options?: {
     semester_id: number | null;
     name: string;
     module: string | null;
+    note?: string | null;
+    classroom?: { name: string | null } | null;
     period: number;
     kind: "regular" | "makeup" | "special";
     session_date: string;
@@ -199,6 +203,8 @@ function setupDetailClient(options?: {
     semester_id: 1,
     name: "Biology",
     module: "Science",
+    note: "실험복 준비",
+    classroom: { name: "Science Lab" },
     period: 4,
     kind: "regular" as const,
     session_date: "2026-07-03",
@@ -297,6 +303,8 @@ function setupSpecialDetailClient() {
                   semester_id: null,
                   name: "Guest Talk",
                   module: null,
+                  note: "강연 자료 지참",
+                  classroom: { name: "Hall" },
                   period: 2,
                   kind: "special",
                   session_date: "2026-07-03",
@@ -377,6 +385,8 @@ describe("teacher dashboard loader helpers", () => {
       currentLecture: {
         sessionId: "session-2",
         lectureId: "lecture-2",
+        classroomName: "Science Lab",
+        note: "실험복 준비",
         period: 4,
       },
       classrooms: [{ id: "classroom-1", name: "Science Lab" }],
@@ -399,6 +409,8 @@ describe("teacher dashboard loader helpers", () => {
           lectureId: "lecture-2",
           name: "Biology",
           module: "Science",
+          classroomName: "Science Lab",
+          note: "실험복 준비",
           period: 4,
           kind: "regular",
         },
@@ -428,6 +440,8 @@ describe("teacher dashboard loader helpers", () => {
         lectureId: "lecture-2",
         name: "Biology",
         module: "Science",
+        classroomName: "Science Lab",
+        note: "실험복 준비",
         period: 4,
       },
       students: [
@@ -451,6 +465,8 @@ describe("teacher dashboard loader helpers", () => {
         semester_id: 1,
         name: "Biology",
         module: "Science",
+        note: "실험복 준비",
+        classroom: { name: "Science Lab" },
         period: 4,
         kind: "regular",
         session_date: "2026-07-03",
@@ -486,6 +502,8 @@ describe("teacher dashboard loader helpers", () => {
         sessionId: "session-special",
         lectureId: null,
         name: "Guest Talk",
+        classroomName: "Hall",
+        note: "강연 자료 지참",
         period: 2,
         kind: "special",
       },
