@@ -19,6 +19,22 @@ export type DashboardStudentAttendance = DashboardStudent & {
   attendance: Database["public"]["Enums"]["attendance_status"];
 };
 
+export type DashboardStudentOption = DashboardStudent & {
+  status: Database["public"]["Enums"]["student_status"];
+};
+
+export type DashboardClassroomOption = {
+  id: string;
+  name: string;
+};
+
+export type DashboardLectureOption = {
+  id: string;
+  name: string;
+  module?: string;
+  semesterId?: number;
+};
+
 export type DashboardViewState =
   | "active-lecture"
   | "day-finished"

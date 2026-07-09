@@ -111,6 +111,61 @@ function setupShellClient() {
         };
       }
 
+      if (table === "classrooms") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              order: vi.fn().mockResolvedValue({
+                data: [{ id: "classroom-1", name: "Science Lab" }],
+                error: null,
+              }),
+            })),
+          })),
+        };
+      }
+
+      if (table === "students") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              order: vi.fn().mockResolvedValue({
+                data: [
+                  {
+                    id: "student-1",
+                    name: "Kim",
+                    num: "1",
+                    status: "active",
+                  },
+                ],
+                error: null,
+              }),
+            })),
+          })),
+        };
+      }
+
+      if (table === "lectures") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                order: vi.fn().mockResolvedValue({
+                  data: [
+                    {
+                      id: "lecture-2",
+                      name: "Biology",
+                      module: "Science",
+                      semester_id: 1,
+                    },
+                  ],
+                  error: null,
+                }),
+              })),
+            })),
+          })),
+        };
+      }
+
       throw new Error(`unexpected table ${table}`);
     }),
   };
@@ -324,6 +379,16 @@ describe("teacher dashboard loader helpers", () => {
         lectureId: "lecture-2",
         period: 4,
       },
+      classrooms: [{ id: "classroom-1", name: "Science Lab" }],
+      students: [{ id: "student-1", name: "Kim", num: "1", status: "active" }],
+      teacherLectures: [
+        {
+          id: "lecture-2",
+          name: "Biology",
+          module: "Science",
+          semesterId: 1,
+        },
+      ],
       viewState: "active-lecture",
       schedule: [
         { period: 1, name: "-" },
@@ -343,6 +408,9 @@ describe("teacher dashboard loader helpers", () => {
     expect(supabase.from).toHaveBeenCalledWith("teachers");
     expect(supabase.from).toHaveBeenCalledWith("semester_schedules");
     expect(supabase.from).toHaveBeenCalledWith("lecture_sessions");
+    expect(supabase.from).toHaveBeenCalledWith("classrooms");
+    expect(supabase.from).toHaveBeenCalledWith("students");
+    expect(supabase.from).toHaveBeenCalledWith("lectures");
     expect(supabase.from).not.toHaveBeenCalledWith("attendances");
   });
 

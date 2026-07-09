@@ -3,9 +3,12 @@ import { data, redirect } from "react-router";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   buildTodaySchedule,
+  type DashboardClassroomOption,
   resolveDashboardViewState,
+  type DashboardLectureOption,
   selectLecture,
   type DashboardLecture,
+  type DashboardStudentOption,
   type DashboardStudentAttendance,
   type DashboardViewState,
 } from "~/features/teacher-dashboard/dashboard";
@@ -19,6 +22,9 @@ type DashboardSupabaseClient = SupabaseClient<Database>;
 export type TeacherDashboardShellLoaderData = {
   schedule: DashboardLecture[];
   currentLecture: DashboardLecture | undefined;
+  classrooms: DashboardClassroomOption[];
+  students: DashboardStudentOption[];
+  teacherLectures: DashboardLectureOption[];
   selectedDate: string;
   dateLabel: string;
   weekdayLabel: string;
@@ -213,6 +219,9 @@ export async function loadTeacherDashboardShellData({
     return {
       schedule: [],
       currentLecture: undefined,
+      classrooms: [],
+      students: [],
+      teacherLectures: [],
       selectedDate,
       dateLabel,
       weekdayLabel,
@@ -228,19 +237,96 @@ export async function loadTeacherDashboardShellData({
     throw new Error("semester schedule is incomplete");
   }
 
-  const { data: dailySessions, error: getSessionsError } =
-    await dashboardSupabase
+  const [
+    dailySessionsResult,
+    classroomsResult,
+    studentsResult,
+    lecturesResult,
+  ] = await Promise.all([
+    dashboardSupabase
       .from("lecture_sessions")
       .select("id, lecture_id, name, module, period, kind")
       .eq("teacher_id", teacher.id)
       .eq("session_date", selectedDate)
-      .order("period", { ascending: true });
-  if (getSessionsError) {
+      .order("period", { ascending: true }),
+    dashboardSupabase
+      .from("classrooms")
+      .select("id, name")
+      .eq("school_id", teacher.school_id)
+      .order("name", { ascending: true }),
+    dashboardSupabase
+      .from("students")
+      .select("id, name, num, status")
+      .eq("school_id", teacher.school_id)
+      .order("num", { ascending: true }),
+    dashboardSupabase
+      .from("lectures")
+      .select("id, name, module, semester_id")
+      .eq("teacher_id", teacher.id)
+      .eq("semester_id", semester.id)
+      .order("created_at", { ascending: true }),
+  ]);
+
+  if (dailySessionsResult.error) {
     throw new Error("error in retrieving lecture sessions");
   }
+  if (classroomsResult.error) {
+    throw new Error("error in retrieving classrooms");
+  }
+  if (studentsResult.error) {
+    throw new Error("error in retrieving students");
+  }
+  if (lecturesResult.error) {
+    throw new Error("error in retrieving lectures");
+  }
+
+  const classrooms = (classroomsResult.data ?? [])
+    .filter((classroom): classroom is { id: string; name: string } =>
+      Boolean(classroom.id && classroom.name),
+    )
+    .map((classroom) => ({
+      id: classroom.id,
+      name: classroom.name,
+    })) satisfies DashboardClassroomOption[];
+
+  const students = (studentsResult.data ?? [])
+    .filter(
+      (
+        student,
+      ): student is {
+        id: string;
+        name: string;
+        num: string;
+        status: Database["public"]["Enums"]["student_status"];
+      } => Boolean(student.id && student.name && student.num),
+    )
+    .map((student) => ({
+      id: student.id,
+      name: student.name,
+      num: student.num,
+      status: student.status,
+    })) satisfies DashboardStudentOption[];
+
+  const teacherLectures = (lecturesResult.data ?? [])
+    .filter(
+      (
+        lecture,
+      ): lecture is {
+        id: string;
+        name: string;
+        module: string | null;
+        semester_id: number | null;
+      } => Boolean(lecture.id && lecture.name),
+    )
+    .map((lecture) => ({
+      id: lecture.id,
+      name: lecture.name,
+      module: lecture.module ?? undefined,
+      semesterId: lecture.semester_id ?? undefined,
+    })) satisfies DashboardLectureOption[];
 
   const schedule = buildTodaySchedule({
-    sessions: (dailySessions ?? []).map((session) => ({
+    sessions: (dailySessionsResult.data ?? []).map((session) => ({
       sessionId: session.id,
       lectureId: session.lecture_id,
       name: session.name,
@@ -270,6 +356,9 @@ export async function loadTeacherDashboardShellData({
   return {
     schedule,
     currentLecture,
+    classrooms,
+    students,
+    teacherLectures,
     selectedDate,
     dateLabel,
     weekdayLabel,

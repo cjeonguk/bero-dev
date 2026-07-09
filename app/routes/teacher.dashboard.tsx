@@ -1,10 +1,20 @@
 import type { Route } from "./+types/teacher.dashboard";
-import { Outlet, type ShouldRevalidateFunctionArgs } from "react-router";
+import {
+  data,
+  Outlet,
+  redirect,
+  type ShouldRevalidateFunctionArgs,
+} from "react-router";
 import { ScheduleSidebar } from "~/components/teacher-dashboard/schedule-sidebar";
+import {
+  handleTeacherDashboardAction,
+  type TeacherDashboardActionResult,
+} from "~/features/teacher-dashboard/dashboard-actions";
 import {
   loadTeacherDashboardShell,
   type TeacherDashboardShellLoaderData,
 } from "~/features/teacher-dashboard/dashboard-loader";
+import { createServiceRoleClient, createClient } from "~/lib/supabase/server";
 
 export type TeacherDashboardOutletContext = TeacherDashboardShellLoaderData;
 
@@ -44,18 +54,69 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   return loadTeacherDashboardShell({ request, sessionId: params.sessionId });
 }
 
+export async function action({ request }: Route.ActionArgs) {
+  const formData = await request.clone().formData();
+  const intent = formData.get("intent");
+  const { supabase, headers } = createClient(request);
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return redirect("/login", { headers });
+  }
+
+  try {
+    return data(
+      await handleTeacherDashboardAction({
+        request,
+        supabase,
+        serviceRoleSupabase: createServiceRoleClient(),
+        userId: user.id,
+      }),
+      { headers },
+    );
+  } catch (error) {
+    return data(
+      {
+        ok: false,
+        message:
+          error instanceof Error
+            ? error.message
+            : "세션 등록 중 오류가 발생했습니다.",
+        intent:
+          intent === "create-manual-session"
+            ? "create-manual-session"
+            : "update-attendances",
+      } satisfies TeacherDashboardActionResult,
+      { headers, status: 400 },
+    );
+  }
+}
+
 export function shouldRevalidate(args: ShouldRevalidateFunctionArgs) {
   return shouldRevalidateTeacherDashboardShell(args);
 }
 
 export default function TeacherDashboard({ loaderData }: Route.ComponentProps) {
-  const { schedule, selectedDate, dateLabel, weekdayLabel } = loaderData;
+  const {
+    schedule,
+    classrooms,
+    students,
+    teacherLectures,
+    selectedDate,
+    dateLabel,
+    weekdayLabel,
+  } = loaderData;
 
   return (
     <div className="flex min-h-full flex-1 w-full bg-muted/30">
       <div className="mx-auto flex min-h-full w-full max-w-[1400px] flex-col gap-4 p-4 lg:flex-row lg:items-stretch lg:gap-6 lg:p-6">
         <ScheduleSidebar
           schedule={schedule}
+          classrooms={classrooms}
+          students={students}
+          teacherLectures={teacherLectures}
           selectedDate={selectedDate}
           dateLabel={dateLabel}
           weekdayLabel={weekdayLabel}
