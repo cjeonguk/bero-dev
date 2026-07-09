@@ -924,7 +924,7 @@ function AdminStudentsSection({
                   기기 {student.deviceId || "미등록"}
                 </p>
               </div>
-              <Field label="상태">
+              <div className="flex flex-col gap-2">
                 <Select name="status" defaultValue={student.status}>
                   <SelectTrigger className="w-full" aria-label="상태">
                     <SelectValue />
@@ -938,7 +938,7 @@ function AdminStudentsSection({
                     </SelectGroup>
                   </SelectContent>
                 </Select>
-              </Field>
+              </div>
               <Button type="submit" variant="outline" disabled={isSubmitting}>
                 상태 저장
               </Button>
