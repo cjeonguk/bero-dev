@@ -10,14 +10,36 @@ export type TeacherSettingsStudent = {
   lastDetectedPlace?: string;
 };
 
+export const lectureDays = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+] as const;
+
+export type LectureDay = (typeof lectureDays)[number];
+
+export type LectureScheduleEntry = {
+  day: LectureDay;
+  period: number;
+};
+
+export type LectureHolidayEntry = {
+  date: string;
+  period: number;
+};
+
 export type TeacherSettingsLecture = {
   id: string;
   name: string;
   module?: string;
   classroomId?: string;
   semesterId?: number;
-  schedule: Json[];
-  holiday: Json[];
+  schedule: LectureScheduleEntry[];
+  holiday: LectureHolidayEntry[];
   students: TeacherSettingsStudent[];
 };
 
@@ -101,6 +123,112 @@ const requiredFieldMessages: Record<string, string> = {
   email: "이메일을 입력해 주세요.",
   password: "임시 비밀번호를 입력해 주세요.",
 };
+
+const lectureDayOrder = lectureDays.reduce<Record<LectureDay, number>>(
+  (order, day, index) => {
+    order[day] = index;
+    return order;
+  },
+  {
+    Sunday: 0,
+    Monday: 1,
+    Tuesday: 2,
+    Wednesday: 3,
+    Thursday: 4,
+    Friday: 5,
+    Saturday: 6,
+  },
+);
+
+function isJsonRecord(value: Json): value is Record<string, Json> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isLectureDay(value: string): value is LectureDay {
+  return lectureDays.includes(value as LectureDay);
+}
+
+function isValidLectureDate(value: string) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
+
+function toLecturePeriod(value: Json) {
+  if (typeof value === "number") {
+    return Number.isInteger(value) && value > 0 ? value : null;
+  }
+
+  if (typeof value === "string" && value.trim() !== "") {
+    const numeric = Number(value);
+    return Number.isInteger(numeric) && numeric > 0 ? numeric : null;
+  }
+
+  return null;
+}
+
+export function normalizeLectureScheduleEntries(
+  value: Json[] | null | undefined,
+): LectureScheduleEntry[] {
+  if (!value?.length) {
+    return [];
+  }
+
+  const uniqueEntries = new Map<string, LectureScheduleEntry>();
+
+  value.forEach((entry) => {
+    if (!isJsonRecord(entry) || typeof entry.day !== "string") {
+      return;
+    }
+
+    const period = toLecturePeriod(entry.period);
+    if (!isLectureDay(entry.day) || period === null) {
+      return;
+    }
+
+    uniqueEntries.set(`${entry.day}:${period}`, {
+      day: entry.day,
+      period,
+    });
+  });
+
+  return [...uniqueEntries.values()].sort((left, right) => {
+    const dayDelta = lectureDayOrder[left.day] - lectureDayOrder[right.day];
+    return dayDelta !== 0 ? dayDelta : left.period - right.period;
+  });
+}
+
+export function normalizeLectureHolidayEntries(
+  value: Json[] | null | undefined,
+): LectureHolidayEntry[] {
+  if (!value?.length) {
+    return [];
+  }
+
+  const uniqueEntries = new Map<string, LectureHolidayEntry>();
+
+  value.forEach((entry) => {
+    if (!isJsonRecord(entry) || typeof entry.date !== "string") {
+      return;
+    }
+
+    const period = toLecturePeriod(entry.period);
+    if (!isValidLectureDate(entry.date) || period === null) {
+      return;
+    }
+
+    uniqueEntries.set(`${entry.date}:${period}`, {
+      date: entry.date,
+      period,
+    });
+  });
+
+  return [...uniqueEntries.values()].sort((left, right) => {
+    if (left.date !== right.date) {
+      return left.date.localeCompare(right.date);
+    }
+
+    return left.period - right.period;
+  });
+}
 
 export function getTodayInSeoul(now = new Date()) {
   return DateTime.fromJSDate(now, { zone: "Asia/Seoul" }).toFormat(

@@ -1,5 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "~/types/database.types";
+import {
+  normalizeLectureHolidayEntries,
+  normalizeLectureScheduleEntries,
+} from "./settings";
 import type {
   TeacherActor,
   TeacherSettingsLoaderData,
@@ -202,8 +206,8 @@ export async function loadTeacherSettingsData({
       module: lecture.module ?? undefined,
       classroomId: lecture.classroom_id ?? undefined,
       semesterId: lecture.semester_id ?? undefined,
-      schedule: lecture.schedule ?? [],
-      holiday: lecture.holiday ?? [],
+      schedule: normalizeLectureScheduleEntries(lecture.schedule ?? []),
+      holiday: normalizeLectureHolidayEntries(lecture.holiday ?? []),
       students: lectureStudents.get(lecture.id) ?? [],
     })),
     myClients: (clientsResult.data ?? []).map((client) => ({

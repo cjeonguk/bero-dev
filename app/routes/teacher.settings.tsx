@@ -1,6 +1,7 @@
 import {
   useEffect,
   useId,
+  useRef,
   useState,
   type FormEvent,
   type KeyboardEvent,
@@ -44,10 +45,16 @@ import { createServiceRoleClient, createClient } from "~/lib/supabase/server";
 import { handleTeacherSettingsAction } from "~/features/teacher-settings/settings-actions";
 import { loadTeacherSettingsData } from "~/features/teacher-settings/settings-loader";
 import type {
+  LectureDay,
+  LectureHolidayEntry,
+  LectureScheduleEntry,
   TeacherSettingsActionResult,
   TeacherSettingsLecture,
 } from "~/features/teacher-settings/settings";
-import { parseAttendanceMarkInput } from "~/features/teacher-settings/settings";
+import {
+  lectureDays,
+  parseAttendanceMarkInput,
+} from "~/features/teacher-settings/settings";
 import type { Route } from "./+types/teacher.settings";
 import { toast } from "sonner";
 
@@ -616,9 +623,6 @@ function ClassroomAutocomplete({
       return normalizeClassroomName(classroom.name).includes(normalizedQuery);
     })
     .slice(0, 8);
-  const hasExactMatch = classrooms.some(
-    (classroom) => normalizeClassroomName(classroom.name) === normalizedQuery,
-  );
 
   const selectClassroom = (classroomName: string) => {
     setQuery(classroomName);
@@ -1013,9 +1017,40 @@ function LectureEditorForm({
   semesters: Array<{ id: number; name: string }>;
   buttonLabel: string;
 }) {
+  const [scheduleRows, setScheduleRows] = useState(() =>
+    createLectureScheduleDrafts(lecture?.schedule),
+  );
+  const [holidayRows, setHolidayRows] = useState(() =>
+    createLectureHolidayDrafts(lecture?.holiday),
+  );
+  const scheduleJsonRef = useRef<HTMLInputElement>(null);
+  const holidayJsonRef = useRef<HTMLInputElement>(null);
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    try {
+      const schedule = parseLectureScheduleDrafts(scheduleRows);
+      const holiday = parseLectureHolidayDrafts(holidayRows);
+
+      if (scheduleJsonRef.current) {
+        scheduleJsonRef.current.value = JSON.stringify(schedule);
+      }
+
+      if (holidayJsonRef.current) {
+        holidayJsonRef.current.value = JSON.stringify(holiday);
+      }
+    } catch (error) {
+      event.preventDefault();
+      toast.error(
+        error instanceof Error ? error.message : "입력값을 확인해 주세요.",
+      );
+    }
+  }
+
   return (
     <Form
       method="post"
+      noValidate
+      onSubmit={handleSubmit}
       className="grid gap-4 rounded-xl border border-border/70 p-4 lg:grid-cols-2"
     >
       <input
@@ -1026,6 +1061,18 @@ function LectureEditorForm({
       {lecture ? (
         <input type="hidden" name="lectureId" value={lecture.id} />
       ) : null}
+      <input
+        ref={scheduleJsonRef}
+        type="hidden"
+        name="scheduleJson"
+        defaultValue={JSON.stringify(lecture?.schedule ?? [])}
+      />
+      <input
+        ref={holidayJsonRef}
+        type="hidden"
+        name="holidayJson"
+        defaultValue={JSON.stringify(lecture?.holiday ?? [])}
+      />
       <Field label={title} className="lg:col-span-2">
         <input
           name="name"
@@ -1068,26 +1115,343 @@ function LectureEditorForm({
           ))}
         </select>
       </Field>
-      <Field label="수업 스케줄 JSON">
-        <textarea
-          name="scheduleJson"
-          rows={5}
-          defaultValue={JSON.stringify(lecture?.schedule ?? [], null, 2)}
-          className={textareaClassName}
-        />
+      <Field label="수업 스케줄" className="lg:col-span-2">
+        <div className="flex flex-col gap-3 rounded-xl border border-border/60 p-4">
+          <p className="text-xs text-muted-foreground">
+            요일과 교시를 추가하면 학기 일정에 맞춰 수업 시간이 생성됩니다.
+          </p>
+          {scheduleRows.length === 0 ? (
+            <LectureEditorEmptyState>
+              등록된 수업 스케줄이 없습니다.
+            </LectureEditorEmptyState>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {scheduleRows.map((row, index) => (
+                <div
+                  key={row.id}
+                  className="grid gap-3 rounded-xl border border-border/60 p-3 sm:grid-cols-[minmax(0,1fr)_120px_auto]"
+                >
+                  <select
+                    value={row.day}
+                    aria-label={`수업 스케줄 ${index + 1}행 요일`}
+                    className={fieldClassName}
+                    onChange={(event) => {
+                      setScheduleRows((currentRows) =>
+                        currentRows.map((currentRow) =>
+                          currentRow.id === row.id
+                            ? { ...currentRow, day: event.target.value }
+                            : currentRow,
+                        ),
+                      );
+                    }}
+                  >
+                    <option value="">요일 선택</option>
+                    {lectureDays.map((day) => (
+                      <option key={day} value={day}>
+                        {lectureDayLabels[day]}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    type="number"
+                    min={1}
+                    inputMode="numeric"
+                    value={row.period}
+                    aria-label={`수업 스케줄 ${index + 1}행 교시`}
+                    className={fieldClassName}
+                    placeholder="교시"
+                    onChange={(event) => {
+                      setScheduleRows((currentRows) =>
+                        currentRows.map((currentRow) =>
+                          currentRow.id === row.id
+                            ? { ...currentRow, period: event.target.value }
+                            : currentRow,
+                        ),
+                      );
+                    }}
+                  />
+                  <div className="flex items-center justify-end sm:justify-start">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setScheduleRows((currentRows) =>
+                          currentRows.filter(
+                            (currentRow) => currentRow.id !== row.id,
+                          ),
+                        );
+                      }}
+                    >
+                      삭제
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          <div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setScheduleRows((currentRows) => [
+                  ...currentRows,
+                  createEmptyLectureScheduleDraft(),
+                ]);
+              }}
+            >
+              스케줄 추가
+            </Button>
+          </div>
+        </div>
       </Field>
-      <Field label="휴일 JSON">
-        <textarea
-          name="holidayJson"
-          rows={5}
-          defaultValue={JSON.stringify(lecture?.holiday ?? [], null, 2)}
-          className={textareaClassName}
-        />
+      <Field label="휴일 / 제외 일정" className="lg:col-span-2">
+        <div className="flex flex-col gap-3 rounded-xl border border-border/60 p-4">
+          <p className="text-xs text-muted-foreground">
+            특정 날짜의 교시를 제외하려면 날짜와 교시를 함께 추가해 주세요.
+          </p>
+          {holidayRows.length === 0 ? (
+            <LectureEditorEmptyState>
+              등록된 휴일이 없습니다.
+            </LectureEditorEmptyState>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {holidayRows.map((row, index) => (
+                <div
+                  key={row.id}
+                  className="grid gap-3 rounded-xl border border-border/60 p-3 sm:grid-cols-[minmax(0,1fr)_120px_auto]"
+                >
+                  <input
+                    type="date"
+                    value={row.date}
+                    aria-label={`휴일 ${index + 1}행 날짜`}
+                    className={fieldClassName}
+                    onChange={(event) => {
+                      setHolidayRows((currentRows) =>
+                        currentRows.map((currentRow) =>
+                          currentRow.id === row.id
+                            ? { ...currentRow, date: event.target.value }
+                            : currentRow,
+                        ),
+                      );
+                    }}
+                  />
+                  <input
+                    type="number"
+                    min={1}
+                    inputMode="numeric"
+                    value={row.period}
+                    aria-label={`휴일 ${index + 1}행 교시`}
+                    className={fieldClassName}
+                    placeholder="교시"
+                    onChange={(event) => {
+                      setHolidayRows((currentRows) =>
+                        currentRows.map((currentRow) =>
+                          currentRow.id === row.id
+                            ? { ...currentRow, period: event.target.value }
+                            : currentRow,
+                        ),
+                      );
+                    }}
+                  />
+                  <div className="flex items-center justify-end sm:justify-start">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setHolidayRows((currentRows) =>
+                          currentRows.filter(
+                            (currentRow) => currentRow.id !== row.id,
+                          ),
+                        );
+                      }}
+                    >
+                      삭제
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          <div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setHolidayRows((currentRows) => [
+                  ...currentRows,
+                  createEmptyLectureHolidayDraft(),
+                ]);
+              }}
+            >
+              휴일 추가
+            </Button>
+          </div>
+        </div>
       </Field>
       <div className="lg:col-span-2">
         <Button type="submit">{buttonLabel}</Button>
       </div>
     </Form>
+  );
+}
+
+type LectureScheduleDraft = {
+  id: string;
+  day: string;
+  period: string;
+};
+
+type LectureHolidayDraft = {
+  id: string;
+  date: string;
+  period: string;
+};
+
+const lectureDayLabels: Record<LectureDay, string> = {
+  Sunday: "일요일",
+  Monday: "월요일",
+  Tuesday: "화요일",
+  Wednesday: "수요일",
+  Thursday: "목요일",
+  Friday: "금요일",
+  Saturday: "토요일",
+};
+
+let lectureEditorRowId = 0;
+
+function createLectureEditorRowId() {
+  lectureEditorRowId += 1;
+  return `lecture-editor-row-${lectureEditorRowId}`;
+}
+
+function isLectureDayValue(value: string): value is LectureDay {
+  return lectureDays.includes(value as LectureDay);
+}
+
+function createEmptyLectureScheduleDraft(): LectureScheduleDraft {
+  return {
+    id: createLectureEditorRowId(),
+    day: "",
+    period: "",
+  };
+}
+
+function createEmptyLectureHolidayDraft(): LectureHolidayDraft {
+  return {
+    id: createLectureEditorRowId(),
+    date: "",
+    period: "",
+  };
+}
+
+function createLectureScheduleDrafts(
+  schedule: LectureScheduleEntry[] | undefined,
+): LectureScheduleDraft[] {
+  return (schedule ?? []).map((entry) => ({
+    id: createLectureEditorRowId(),
+    day: entry.day,
+    period: entry.period.toString(),
+  }));
+}
+
+function createLectureHolidayDrafts(
+  holidays: LectureHolidayEntry[] | undefined,
+): LectureHolidayDraft[] {
+  return (holidays ?? []).map((entry) => ({
+    id: createLectureEditorRowId(),
+    date: entry.date,
+    period: entry.period.toString(),
+  }));
+}
+
+function parseLectureScheduleDrafts(
+  rows: LectureScheduleDraft[],
+): LectureScheduleEntry[] {
+  const schedule: LectureScheduleEntry[] = [];
+  const seenEntries = new Set<string>();
+
+  rows.forEach((row, index) => {
+    const day = row.day.trim();
+    const periodValue = row.period.trim();
+
+    if (day === "" && periodValue === "") {
+      return;
+    }
+
+    if (day === "" || periodValue === "") {
+      throw new Error(`수업 스케줄 ${index + 1}행을 모두 입력해 주세요.`);
+    }
+
+    if (!isLectureDayValue(day)) {
+      throw new Error(
+        `수업 스케줄 ${index + 1}행의 요일을 다시 선택해 주세요.`,
+      );
+    }
+
+    const period = Number(periodValue);
+    if (!Number.isInteger(period) || period < 1) {
+      throw new Error(
+        `수업 스케줄 ${index + 1}행의 교시는 1 이상의 정수여야 합니다.`,
+      );
+    }
+
+    const entryKey = `${day}:${period}`;
+    if (seenEntries.has(entryKey)) {
+      throw new Error(`수업 스케줄 ${index + 1}행이 중복되었습니다.`);
+    }
+
+    seenEntries.add(entryKey);
+    schedule.push({ day, period });
+  });
+
+  return schedule;
+}
+
+function parseLectureHolidayDrafts(
+  rows: LectureHolidayDraft[],
+): LectureHolidayEntry[] {
+  const holidays: LectureHolidayEntry[] = [];
+  const seenEntries = new Set<string>();
+
+  rows.forEach((row, index) => {
+    const date = row.date.trim();
+    const periodValue = row.period.trim();
+
+    if (date === "" && periodValue === "") {
+      return;
+    }
+
+    if (date === "" || periodValue === "") {
+      throw new Error(`휴일 ${index + 1}행을 모두 입력해 주세요.`);
+    }
+
+    const period = Number(periodValue);
+    if (!Number.isInteger(period) || period < 1) {
+      throw new Error(`휴일 ${index + 1}행의 교시는 1 이상의 정수여야 합니다.`);
+    }
+
+    const entryKey = `${date}:${period}`;
+    if (seenEntries.has(entryKey)) {
+      throw new Error(`휴일 ${index + 1}행이 중복되었습니다.`);
+    }
+
+    seenEntries.add(entryKey);
+    holidays.push({ date, period });
+  });
+
+  return holidays;
+}
+
+function LectureEditorEmptyState({ children }: { children: ReactNode }) {
+  return (
+    <div className="rounded-xl border border-dashed border-border/60 px-4 py-5 text-sm text-muted-foreground">
+      {children}
+    </div>
   );
 }
 
@@ -1253,6 +1617,3 @@ function Field({
 
 const fieldClassName =
   "h-9 w-full rounded-3xl border border-input bg-input/30 px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50";
-
-const textareaClassName =
-  "min-h-28 w-full rounded-3xl border border-input bg-input/30 px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50";
