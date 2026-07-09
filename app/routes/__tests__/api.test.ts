@@ -165,7 +165,7 @@ function setupActionTest(options: ActionSetupOptions = {}) {
       "content-type": "application/json",
     },
     body: JSON.stringify({
-      clientId: options.requestClientId ?? testClientId,
+      clientID: options.requestClientId ?? testClientId,
       deviceID: "device-1",
       rssi: -42,
       deviceName: "Beacon",

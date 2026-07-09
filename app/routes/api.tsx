@@ -6,7 +6,7 @@ import { createServiceRoleClient } from "~/lib/supabase/server";
 import { getCurrentPeriod, type PeriodScheduleEntry } from "~/utils/schedules";
 
 interface Body {
-  clientId: string;
+  clientID: string;
   deviceID: string;
   rssi: number;
   deviceName: string;
@@ -58,7 +58,7 @@ export async function action({ request }: Route.ActionArgs) {
 
   const body = (await request.json()) as Body;
 
-  if (!body.clientId || !body.deviceID) {
+  if (!body.clientID || !body.deviceID) {
     return Response.json(
       { success: false, studentName: "", error: "Invalid request" },
       { status: 400 },
@@ -73,7 +73,7 @@ export async function action({ request }: Route.ActionArgs) {
         .select(
           "id, school_id, token_hash, active, default_classroom_id, owner_teacher_id",
         )
-        .eq("id", body.clientId)
+        .eq("id", body.clientID)
         .maybeSingle();
 
     if (attendanceClientError || !attendanceClient) {
