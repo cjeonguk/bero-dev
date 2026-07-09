@@ -84,6 +84,7 @@ export type TeacherSettingsLoaderData = {
 export type TeacherSettingsActionResult = {
   ok: boolean;
   message: string;
+  intent?: string;
   token?: string;
 };
 

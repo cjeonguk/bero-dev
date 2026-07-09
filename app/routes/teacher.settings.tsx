@@ -1,6 +1,8 @@
 import {
+  forwardRef,
   useEffect,
   useId,
+  useImperativeHandle,
   useRef,
   useState,
   type FormEvent,
@@ -71,6 +73,10 @@ type SettingsSection = {
   id: SettingsSectionId;
   label: string;
   adminOnly?: boolean;
+};
+
+type ResettableFormHandle = {
+  reset: () => void;
 };
 
 const baseSections: SettingsSection[] = [
@@ -145,6 +151,13 @@ export default function TeacherSettings({ loaderData }: Route.ComponentProps) {
   const navigation = useNavigation();
   const [searchParams] = useSearchParams();
   const [dismissedToken, setDismissedToken] = useState<string | null>(null);
+  const createTeacherClientFormRef = useRef<HTMLFormElement>(null);
+  const createClassroomClientFormRef = useRef<HTMLFormElement>(null);
+  const createClassroomAutocompleteRef = useRef<ResettableFormHandle>(null);
+  const createLectureFormRef = useRef<ResettableFormHandle>(null);
+  const createStudentFormRef = useRef<HTMLFormElement>(null);
+  const createTeacherAccountFormRef = useRef<HTMLFormElement>(null);
+  const markAttendanceFormRef = useRef<HTMLFormElement>(null);
   const isSubmitting = navigation.state !== "idle";
   const sections = loaderData.admin
     ? [...baseSections, ...adminSections]
@@ -164,6 +177,30 @@ export default function TeacherSettings({ loaderData }: Route.ComponentProps) {
 
     if (actionData.ok) {
       toast.success(actionData.message);
+
+      switch (actionData.intent) {
+        case "create-teacher-client":
+          createTeacherClientFormRef.current?.reset();
+          break;
+        case "create-classroom-client":
+          createClassroomClientFormRef.current?.reset();
+          createClassroomAutocompleteRef.current?.reset();
+          break;
+        case "create-lecture":
+          createLectureFormRef.current?.reset();
+          break;
+        case "create-student":
+          createStudentFormRef.current?.reset();
+          break;
+        case "create-teacher-account":
+          createTeacherAccountFormRef.current?.reset();
+          break;
+        case "mark-attendance":
+          markAttendanceFormRef.current?.reset();
+          break;
+        default:
+          break;
+      }
     } else {
       toast.error(actionData.message);
     }
@@ -179,6 +216,13 @@ export default function TeacherSettings({ loaderData }: Route.ComponentProps) {
             section={activeSection}
             loaderData={loaderData}
             isSubmitting={isSubmitting}
+            createTeacherClientFormRef={createTeacherClientFormRef}
+            createClassroomClientFormRef={createClassroomClientFormRef}
+            createClassroomAutocompleteRef={createClassroomAutocompleteRef}
+            createLectureFormRef={createLectureFormRef}
+            createStudentFormRef={createStudentFormRef}
+            createTeacherAccountFormRef={createTeacherAccountFormRef}
+            markAttendanceFormRef={markAttendanceFormRef}
           />
         </div>
       </div>
@@ -284,10 +328,24 @@ function SettingsSectionPanel({
   section,
   loaderData,
   isSubmitting,
+  createTeacherClientFormRef,
+  createClassroomClientFormRef,
+  createClassroomAutocompleteRef,
+  createLectureFormRef,
+  createStudentFormRef,
+  createTeacherAccountFormRef,
+  markAttendanceFormRef,
 }: {
   section: SettingsSectionId;
   loaderData: Route.ComponentProps["loaderData"];
   isSubmitting: boolean;
+  createTeacherClientFormRef: React.RefObject<HTMLFormElement | null>;
+  createClassroomClientFormRef: React.RefObject<HTMLFormElement | null>;
+  createClassroomAutocompleteRef: React.RefObject<ResettableFormHandle | null>;
+  createLectureFormRef: React.RefObject<ResettableFormHandle | null>;
+  createStudentFormRef: React.RefObject<HTMLFormElement | null>;
+  createTeacherAccountFormRef: React.RefObject<HTMLFormElement | null>;
+  markAttendanceFormRef: React.RefObject<HTMLFormElement | null>;
 }) {
   switch (section) {
     case "profile":
@@ -296,17 +354,27 @@ function SettingsSectionPanel({
       );
     case "lectures":
       return (
-        <LecturesSection loaderData={loaderData} isSubmitting={isSubmitting} />
+        <LecturesSection
+          loaderData={loaderData}
+          isSubmitting={isSubmitting}
+          createLectureFormRef={createLectureFormRef}
+        />
       );
     case "clients":
       return (
-        <ClientsSection loaderData={loaderData} isSubmitting={isSubmitting} />
+        <ClientsSection
+          loaderData={loaderData}
+          isSubmitting={isSubmitting}
+          createTeacherClientFormRef={createTeacherClientFormRef}
+        />
       );
     case "admin-clients":
       return loaderData.admin ? (
         <AdminClientsSection
           loaderData={loaderData}
           isSubmitting={isSubmitting}
+          createClassroomClientFormRef={createClassroomClientFormRef}
+          createClassroomAutocompleteRef={createClassroomAutocompleteRef}
         />
       ) : null;
     case "admin-students":
@@ -314,6 +382,7 @@ function SettingsSectionPanel({
         <AdminStudentsSection
           loaderData={loaderData}
           isSubmitting={isSubmitting}
+          createStudentFormRef={createStudentFormRef}
         />
       ) : null;
     case "admin-teachers":
@@ -321,6 +390,7 @@ function SettingsSectionPanel({
         <AdminTeachersSection
           loaderData={loaderData}
           isSubmitting={isSubmitting}
+          createTeacherAccountFormRef={createTeacherAccountFormRef}
         />
       ) : null;
     case "admin-attendance":
@@ -328,6 +398,7 @@ function SettingsSectionPanel({
         <AdminAttendanceSection
           loaderData={loaderData}
           isSubmitting={isSubmitting}
+          markAttendanceFormRef={markAttendanceFormRef}
         />
       ) : null;
     default:
@@ -376,9 +447,11 @@ function ProfileSection({
 function LecturesSection({
   loaderData,
   isSubmitting,
+  createLectureFormRef,
 }: {
   loaderData: Route.ComponentProps["loaderData"];
   isSubmitting: boolean;
+  createLectureFormRef: React.RefObject<ResettableFormHandle | null>;
 }) {
   return (
     <SectionCard
@@ -387,6 +460,7 @@ function LecturesSection({
     >
       <div className="flex flex-col gap-6">
         <LectureEditorForm
+          ref={createLectureFormRef}
           title="새 수업 추가"
           classrooms={loaderData.classrooms}
           semesters={loaderData.semesters}
@@ -524,9 +598,11 @@ function LecturesSection({
 function ClientsSection({
   loaderData,
   isSubmitting,
+  createTeacherClientFormRef,
 }: {
   loaderData: Route.ComponentProps["loaderData"];
   isSubmitting: boolean;
+  createTeacherClientFormRef: React.RefObject<HTMLFormElement | null>;
 }) {
   return (
     <SectionCard
@@ -535,6 +611,7 @@ function ClientsSection({
     >
       <div className="flex flex-col gap-6">
         <Form
+          ref={createTeacherClientFormRef}
           method="post"
           className="grid gap-4 rounded-xl border border-border/70 p-4 lg:grid-cols-3"
         >
@@ -566,9 +643,13 @@ function ClientsSection({
 function AdminClientsSection({
   loaderData,
   isSubmitting,
+  createClassroomClientFormRef,
+  createClassroomAutocompleteRef,
 }: {
   loaderData: Route.ComponentProps["loaderData"];
   isSubmitting: boolean;
+  createClassroomClientFormRef: React.RefObject<HTMLFormElement | null>;
+  createClassroomAutocompleteRef: React.RefObject<ResettableFormHandle | null>;
 }) {
   return (
     <SectionCard
@@ -577,6 +658,7 @@ function AdminClientsSection({
     >
       <div className="flex flex-col gap-4">
         <Form
+          ref={createClassroomClientFormRef}
           method="post"
           className="grid gap-4 rounded-xl border border-border/70 p-4"
         >
@@ -585,7 +667,10 @@ function AdminClientsSection({
             <input name="name" className={fieldClassName} />
           </Field>
           <Field label="기본 교실">
-            <ClassroomAutocomplete classrooms={loaderData.classrooms} />
+            <ClassroomAutocomplete
+              ref={createClassroomAutocompleteRef}
+              classrooms={loaderData.classrooms}
+            />
           </Field>
           <div>
             <Button type="submit" disabled={isSubmitting}>
@@ -604,11 +689,12 @@ function AdminClientsSection({
   );
 }
 
-function ClassroomAutocomplete({
-  classrooms,
-}: {
-  classrooms: Array<{ id: string; name: string }>;
-}) {
+const ClassroomAutocomplete = forwardRef<
+  ResettableFormHandle,
+  {
+    classrooms: Array<{ id: string; name: string }>;
+  }
+>(function ClassroomAutocomplete({ classrooms }, ref) {
   const listboxId = useId();
   const [query, setQuery] = useState("");
   const [isOpen, setIsOpen] = useState(false);
@@ -629,6 +715,14 @@ function ClassroomAutocomplete({
     setIsOpen(false);
     setActiveIndex(-1);
   };
+
+  useImperativeHandle(ref, () => ({
+    reset() {
+      setQuery("");
+      setIsOpen(false);
+      setActiveIndex(-1);
+    },
+  }));
 
   const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === "ArrowDown") {
@@ -741,7 +835,7 @@ function ClassroomAutocomplete({
       ) : null}
     </div>
   );
-}
+});
 
 function normalizeClassroomName(name: string) {
   return name.trim().toLowerCase();
@@ -750,9 +844,11 @@ function normalizeClassroomName(name: string) {
 function AdminStudentsSection({
   loaderData,
   isSubmitting,
+  createStudentFormRef,
 }: {
   loaderData: Route.ComponentProps["loaderData"];
   isSubmitting: boolean;
+  createStudentFormRef: React.RefObject<HTMLFormElement | null>;
 }) {
   return (
     <SectionCard
@@ -761,6 +857,7 @@ function AdminStudentsSection({
     >
       <div className="flex flex-col gap-4">
         <Form
+          ref={createStudentFormRef}
           method="post"
           className="grid gap-4 rounded-xl border border-border/70 p-4"
         >
@@ -828,9 +925,11 @@ function AdminStudentsSection({
 function AdminTeachersSection({
   loaderData,
   isSubmitting,
+  createTeacherAccountFormRef,
 }: {
   loaderData: Route.ComponentProps["loaderData"];
   isSubmitting: boolean;
+  createTeacherAccountFormRef: React.RefObject<HTMLFormElement | null>;
 }) {
   return (
     <SectionCard
@@ -839,6 +938,7 @@ function AdminTeachersSection({
     >
       <div className="flex flex-col gap-4">
         <Form
+          ref={createTeacherAccountFormRef}
           method="post"
           className="grid gap-4 rounded-xl border border-border/70 p-4"
         >
@@ -899,9 +999,11 @@ function AdminTeachersSection({
 function AdminAttendanceSection({
   loaderData,
   isSubmitting,
+  markAttendanceFormRef,
 }: {
   loaderData: Route.ComponentProps["loaderData"];
   isSubmitting: boolean;
+  markAttendanceFormRef: React.RefObject<HTMLFormElement | null>;
 }) {
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     const formData = new FormData(event.currentTarget);
@@ -929,6 +1031,7 @@ function AdminAttendanceSection({
       description="날짜 범위를 지정해 공결 또는 병결을 일괄 처리합니다."
     >
       <Form
+        ref={markAttendanceFormRef}
         method="post"
         noValidate
         onSubmit={handleSubmit}
@@ -1004,19 +1107,20 @@ function AdminAttendanceSection({
   );
 }
 
-function LectureEditorForm({
-  title,
-  lecture,
-  classrooms,
-  semesters,
-  buttonLabel,
-}: {
-  title: string;
-  lecture?: TeacherSettingsLecture;
-  classrooms: Array<{ id: string; name: string }>;
-  semesters: Array<{ id: number; name: string }>;
-  buttonLabel: string;
-}) {
+const LectureEditorForm = forwardRef<
+  ResettableFormHandle,
+  {
+    title: string;
+    lecture?: TeacherSettingsLecture;
+    classrooms: Array<{ id: string; name: string }>;
+    semesters: Array<{ id: number; name: string }>;
+    buttonLabel: string;
+  }
+>(function LectureEditorForm(
+  { title, lecture, classrooms, semesters, buttonLabel },
+  ref,
+) {
+  const formRef = useRef<HTMLFormElement>(null);
   const [scheduleRows, setScheduleRows] = useState(() =>
     createLectureScheduleDrafts(lecture?.schedule),
   );
@@ -1025,6 +1129,22 @@ function LectureEditorForm({
   );
   const scheduleJsonRef = useRef<HTMLInputElement>(null);
   const holidayJsonRef = useRef<HTMLInputElement>(null);
+
+  useImperativeHandle(ref, () => ({
+    reset() {
+      formRef.current?.reset();
+      setScheduleRows(createLectureScheduleDrafts(lecture?.schedule));
+      setHolidayRows(createLectureHolidayDrafts(lecture?.holiday));
+
+      if (scheduleJsonRef.current) {
+        scheduleJsonRef.current.value = JSON.stringify(lecture?.schedule ?? []);
+      }
+
+      if (holidayJsonRef.current) {
+        holidayJsonRef.current.value = JSON.stringify(lecture?.holiday ?? []);
+      }
+    },
+  }));
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     try {
@@ -1048,6 +1168,7 @@ function LectureEditorForm({
 
   return (
     <Form
+      ref={formRef}
       method="post"
       noValidate
       onSubmit={handleSubmit}
@@ -1298,7 +1419,7 @@ function LectureEditorForm({
       </div>
     </Form>
   );
-}
+});
 
 type LectureScheduleDraft = {
   id: string;

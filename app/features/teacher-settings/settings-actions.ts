@@ -254,7 +254,7 @@ export async function handleTeacherSettingsAction({
       throw error;
     }
 
-    return { ok: true, message: "프로필을 저장했습니다." };
+    return { ok: true, message: "프로필을 저장했습니다.", intent };
   }
 
   if (intent === "create-teacher-client") {
@@ -275,7 +275,7 @@ export async function handleTeacherSettingsAction({
       throw error;
     }
 
-    return { ok: true, message: "클라이언트를 등록했습니다.", token };
+    return { ok: true, message: "클라이언트를 등록했습니다.", intent, token };
   }
 
   if (intent === "create-classroom-client") {
@@ -307,7 +307,7 @@ export async function handleTeacherSettingsAction({
       throw error;
     }
 
-    return { ok: true, message: "클라이언트를 등록했습니다.", token };
+    return { ok: true, message: "클라이언트를 등록했습니다.", intent, token };
   }
 
   if (
@@ -370,6 +370,7 @@ export async function handleTeacherSettingsAction({
         intent === "reactivate-client"
           ? "클라이언트를 재활성화했습니다."
           : "클라이언트를 비활성화했습니다.",
+      intent,
     };
   }
 
@@ -400,7 +401,7 @@ export async function handleTeacherSettingsAction({
       now: now(),
     });
 
-    return { ok: true, message: "수업을 등록했습니다." };
+    return { ok: true, message: "수업을 등록했습니다.", intent };
   }
 
   if (intent === "update-lecture") {
@@ -432,7 +433,7 @@ export async function handleTeacherSettingsAction({
       now: now(),
     });
 
-    return { ok: true, message: "수업을 수정했습니다." };
+    return { ok: true, message: "수업을 수정했습니다.", intent };
   }
 
   if (intent === "add-student-to-lecture") {
@@ -457,7 +458,7 @@ export async function handleTeacherSettingsAction({
       now: now(),
     });
 
-    return { ok: true, message: "학생을 수업에 추가했습니다." };
+    return { ok: true, message: "학생을 수업에 추가했습니다.", intent };
   }
 
   if (intent === "remove-student-from-lecture") {
@@ -480,7 +481,7 @@ export async function handleTeacherSettingsAction({
       now: now(),
     });
 
-    return { ok: true, message: "학생을 수업에서 제거했습니다." };
+    return { ok: true, message: "학생을 수업에서 제거했습니다.", intent };
   }
 
   if (intent === "create-student") {
@@ -498,7 +499,7 @@ export async function handleTeacherSettingsAction({
       throw error;
     }
 
-    return { ok: true, message: "학생을 등록했습니다." };
+    return { ok: true, message: "학생을 등록했습니다.", intent };
   }
 
   if (intent === "update-student-status") {
@@ -517,7 +518,7 @@ export async function handleTeacherSettingsAction({
       throw error;
     }
 
-    return { ok: true, message: "학생 상태를 변경했습니다." };
+    return { ok: true, message: "학생 상태를 변경했습니다.", intent };
   }
 
   if (intent === "create-teacher-account") {
@@ -551,7 +552,7 @@ export async function handleTeacherSettingsAction({
       throw error;
     }
 
-    return { ok: true, message: "선생 계정을 생성했습니다." };
+    return { ok: true, message: "선생 계정을 생성했습니다.", intent };
   }
 
   if (intent === "delete-teacher-account") {
@@ -593,7 +594,7 @@ export async function handleTeacherSettingsAction({
       throw updateError;
     }
 
-    return { ok: true, message: "선생 계정을 삭제했습니다." };
+    return { ok: true, message: "선생 계정을 삭제했습니다.", intent };
   }
 
   if (intent === "mark-attendance") {
@@ -633,7 +634,7 @@ export async function handleTeacherSettingsAction({
     }
 
     if (!sessions || sessions.length === 0) {
-      return { ok: true, message: "해당 기간/교시에 세션이 없습니다." };
+      return { ok: true, message: "해당 기간/교시에 세션이 없습니다.", intent };
     }
 
     const sessionIds = sessions.map((s) => s.id);
@@ -653,12 +654,14 @@ export async function handleTeacherSettingsAction({
       return {
         ok: true,
         message: "해당 기간/교시에 처리할 출석 대상이 없습니다.",
+        intent,
       };
     }
 
     return {
       ok: true,
       message: `${rows.length}개 세션의 출석 상태를 저장했습니다.`,
+      intent,
     };
   }
 

@@ -400,7 +400,11 @@ describe("handleTeacherSettingsAction", () => {
       name: "Updated Teacher",
     });
 
-    expect(result).toEqual({ ok: true, message: "프로필을 저장했습니다." });
+    expect(result).toEqual({
+      ok: true,
+      message: "프로필을 저장했습니다.",
+      intent: "update-profile",
+    });
     expect(updates).toContainEqual({
       table: "teachers",
       values: { name: "Updated Teacher" },
@@ -563,7 +567,11 @@ describe("handleTeacherSettingsAction", () => {
       holidayJson: "[]",
     });
 
-    expect(result).toEqual({ ok: true, message: "수업을 등록했습니다." });
+    expect(result).toEqual({
+      ok: true,
+      message: "수업을 등록했습니다.",
+      intent: "create-lecture",
+    });
     expect(inserts).toContainEqual({
       table: "lectures",
       values: expect.objectContaining({
@@ -593,7 +601,11 @@ describe("handleTeacherSettingsAction", () => {
       holidayJson: "[]",
     });
 
-    expect(result).toEqual({ ok: true, message: "수업을 수정했습니다." });
+    expect(result).toEqual({
+      ok: true,
+      message: "수업을 수정했습니다.",
+      intent: "update-lecture",
+    });
     expect(updates).toContainEqual({
       table: "lectures",
       values: {
@@ -662,6 +674,7 @@ describe("handleTeacherSettingsAction", () => {
     expect(addResult.result).toEqual({
       ok: true,
       message: "학생을 수업에 추가했습니다.",
+      intent: "add-student-to-lecture",
     });
     expect(addResult.inserts).toContainEqual({
       table: "enrollments",
@@ -684,6 +697,7 @@ describe("handleTeacherSettingsAction", () => {
     expect(removeResult.result).toEqual({
       ok: true,
       message: "학생을 수업에서 제거했습니다.",
+      intent: "remove-student-from-lecture",
     });
     expect(removeResult.serviceRoleSupabase.rpcs).toContainEqual({
       schema: "public",
@@ -718,6 +732,7 @@ describe("handleTeacherSettingsAction", () => {
     expect(deactivateResult.result).toEqual({
       ok: true,
       message: "클라이언트를 비활성화했습니다.",
+      intent: "deactivate-client",
     });
     expect(deactivateResult.updates).toContainEqual({
       table: "attendance_clients",
@@ -727,6 +742,7 @@ describe("handleTeacherSettingsAction", () => {
     expect(reactivateResult.result).toEqual({
       ok: true,
       message: "클라이언트를 재활성화했습니다.",
+      intent: "reactivate-client",
     });
     expect(reactivateResult.updates).toContainEqual({
       table: "attendance_clients",
@@ -839,6 +855,7 @@ describe("handleTeacherSettingsAction", () => {
     expect(createResult.result).toEqual({
       ok: true,
       message: "학생을 등록했습니다.",
+      intent: "create-student",
     });
     expect(createResult.inserts).toContainEqual({
       table: "students",
@@ -851,6 +868,7 @@ describe("handleTeacherSettingsAction", () => {
     expect(updateResult.result).toEqual({
       ok: true,
       message: "학생 상태를 변경했습니다.",
+      intent: "update-student-status",
     });
     expect(updateResult.updates).toContainEqual({
       table: "students",
@@ -880,6 +898,7 @@ describe("handleTeacherSettingsAction", () => {
     expect(createResult.result).toEqual({
       ok: true,
       message: "선생 계정을 생성했습니다.",
+      intent: "create-teacher-account",
     });
     expect(createResult.inserts).toContainEqual({
       table: "teachers",
@@ -902,6 +921,7 @@ describe("handleTeacherSettingsAction", () => {
     expect(deleteResult.result).toEqual({
       ok: true,
       message: "선생 계정을 삭제했습니다.",
+      intent: "delete-teacher-account",
     });
     expect(
       deleteResult.serviceRoleSupabase.auth.admin.deleteUser,
@@ -934,6 +954,7 @@ describe("handleTeacherSettingsAction", () => {
       expect(result).toEqual({
         ok: true,
         message: "5개 세션의 출석 상태를 저장했습니다.",
+        intent: "mark-attendance",
       });
       expect(updates).toContainEqual({
         table: "attendances",
@@ -1010,6 +1031,7 @@ describe("handleTeacherSettingsAction", () => {
       expect(result).toEqual({
         ok: true,
         message: "해당 기간/교시에 세션이 없습니다.",
+        intent: "mark-attendance",
       });
       expect(updates).toHaveLength(0);
     });
@@ -1035,6 +1057,7 @@ describe("handleTeacherSettingsAction", () => {
       expect(result).toEqual({
         ok: true,
         message: "해당 기간/교시에 처리할 출석 대상이 없습니다.",
+        intent: "mark-attendance",
       });
     });
 
