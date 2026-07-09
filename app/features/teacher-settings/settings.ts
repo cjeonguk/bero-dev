@@ -91,6 +91,7 @@ const requiredFieldMessages: Record<string, string> = {
   name: "이름을 입력해 주세요.",
   classroomId: "교실을 선택해 주세요.",
   defaultClassroomId: "기본 교실을 선택해 주세요.",
+  defaultClassroomName: "교실 이름을 입력해 주세요.",
   lectureId: "수업 정보를 다시 확인해 주세요.",
   clientId: "클라이언트 정보를 다시 확인해 주세요.",
   studentId: "학생을 선택해 주세요.",

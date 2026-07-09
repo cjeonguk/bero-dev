@@ -5,6 +5,19 @@ import { handleTeacherSettingsAction } from "./settings-actions";
 type ActionSupabaseOptions = {
   actorIsAdmin?: boolean;
   teacherUserId?: string | null;
+  classrooms?: Array<{
+    id: string;
+    name: string;
+    school_id: string | null;
+  }>;
+  classroomInsertError?: {
+    code: string;
+    concurrentClassroom?: {
+      id: string;
+      name: string;
+      school_id: string | null;
+    };
+  };
   attendanceClient?: {
     id: string;
     school_id: string;
@@ -32,6 +45,11 @@ function createActionSupabase(options: ActionSupabaseOptions = {}) {
     method: string;
     args: unknown[];
   }> = [];
+  const classrooms = [
+    ...(options.classrooms ?? [
+      { id: "classroom-1", name: "Room A", school_id: "school-1" },
+    ]),
+  ];
 
   const actor = {
     id: "teacher-row-1",
@@ -120,6 +138,45 @@ function createActionSupabase(options: ActionSupabaseOptions = {}) {
               return Promise.resolve({ error: null });
             }),
           })),
+        };
+      }
+
+      if (table === "classrooms") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn((column: string, value: string) => ({
+              order: vi.fn().mockResolvedValue({
+                data: classrooms.filter((classroom) =>
+                  column === "school_id" ? classroom.school_id === value : true,
+                ),
+                error: null,
+              }),
+            })),
+          })),
+          insert: vi.fn(
+            (values: { id: string; name: string; school_id: string }) => {
+              inserts.push({ table, values });
+
+              if (options.classroomInsertError) {
+                if (options.classroomInsertError.concurrentClassroom) {
+                  classrooms.push(
+                    options.classroomInsertError.concurrentClassroom,
+                  );
+                }
+
+                return Promise.resolve({
+                  error: {
+                    code: options.classroomInsertError.code,
+                    message: "simulated classroom insert error",
+                  },
+                });
+              }
+
+              classrooms.push(values);
+
+              return Promise.resolve({ error: null });
+            },
+          ),
         };
       }
 
@@ -317,12 +374,18 @@ async function submitAction(
   });
   const actionSupabase = createActionSupabase(options);
   const serviceRoleSupabase = createServiceRoleSupabase();
+  let generatedIdCount = 0;
   const result = await handleTeacherSettingsAction({
     request,
     supabase: actionSupabase.supabase as never,
     serviceRoleSupabase: serviceRoleSupabase as never,
     userId: "user-1",
-    generateId: () => "generated-id",
+    generateId: () => {
+      const count = generatedIdCount;
+      generatedIdCount += 1;
+
+      return count === 0 ? "generated-id" : `generated-id-${count + 1}`;
+    },
     generateToken: () => "plain-text-token",
     now: () => new Date("2026-07-08T12:00:00.000Z"),
   });
@@ -371,7 +434,7 @@ describe("handleTeacherSettingsAction", () => {
       {
         intent: "create-classroom-client",
         name: "Room A Tablet",
-        defaultClassroomId: "classroom-1",
+        defaultClassroomName: "Room A",
       },
       { actorIsAdmin: true },
     );
@@ -392,9 +455,81 @@ describe("handleTeacherSettingsAction", () => {
       submitAction({
         intent: "create-classroom-client",
         name: "Room A Tablet",
-        defaultClassroomId: "classroom-1",
+        defaultClassroomName: "Room A",
       }),
     ).rejects.toThrow("admin privileges are required");
+  });
+
+  it("creates a new classroom when the typed classroom name does not exist", async () => {
+    const { result, inserts } = await submitAction(
+      {
+        intent: "create-classroom-client",
+        name: "Room B Tablet",
+        defaultClassroomName: "  Room B202  ",
+      },
+      { actorIsAdmin: true },
+    );
+
+    expect(result).toMatchObject({ ok: true, token: "plain-text-token" });
+    expect(inserts).toContainEqual({
+      table: "classrooms",
+      values: {
+        id: "generated-id",
+        name: "Room B202",
+        school_id: "school-1",
+      },
+    });
+    expect(inserts).toContainEqual({
+      table: "attendance_clients",
+      values: expect.objectContaining({
+        id: "generated-id-2",
+        default_classroom_id: "generated-id",
+        owner_teacher_id: null,
+      }),
+    });
+  });
+
+  it("reuses a concurrently created classroom after a unique-name conflict", async () => {
+    const { result, inserts } = await submitAction(
+      {
+        intent: "create-classroom-client",
+        name: "Room B Tablet",
+        defaultClassroomName: "Room B202",
+      },
+      {
+        actorIsAdmin: true,
+        classrooms: [],
+        classroomInsertError: {
+          code: "23505",
+          concurrentClassroom: {
+            id: "classroom-2",
+            name: "room b202",
+            school_id: "school-1",
+          },
+        },
+      },
+    );
+
+    expect(result).toMatchObject({ ok: true, token: "plain-text-token" });
+    expect(inserts).toContainEqual({
+      table: "attendance_clients",
+      values: expect.objectContaining({
+        default_classroom_id: "classroom-2",
+      }),
+    });
+  });
+
+  it("requires a classroom name when creating a classroom client", async () => {
+    await expect(
+      submitAction(
+        {
+          intent: "create-classroom-client",
+          name: "Room A Tablet",
+          defaultClassroomName: "   ",
+        },
+        { actorIsAdmin: true },
+      ),
+    ).rejects.toThrow("교실 이름을 입력해 주세요.");
   });
 
   it("allows admins to create their own teacher client", async () => {

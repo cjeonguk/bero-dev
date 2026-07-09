@@ -52,6 +52,93 @@ function hashToken(token: string) {
   return createHash("sha256").update(token).digest("hex");
 }
 
+function normalizeClassroomName(name: string) {
+  return name.trim().toLowerCase();
+}
+
+function isUniqueViolationError(error: unknown): error is { code: string } {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    error.code === "23505"
+  );
+}
+
+async function loadSchoolClassrooms({
+  supabase,
+  schoolId,
+}: {
+  supabase: TeacherSettingsSupabaseClient;
+  schoolId: string;
+}) {
+  const { data, error } = await supabase
+    .from("classrooms")
+    .select("id, name")
+    .eq("school_id", schoolId)
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []).filter(
+    (classroom): classroom is { id: string; name: string } =>
+      Boolean(classroom.id && classroom.name),
+  );
+}
+
+async function resolveClassroomId({
+  supabase,
+  schoolId,
+  classroomName,
+  generateId,
+}: {
+  supabase: TeacherSettingsSupabaseClient;
+  schoolId: string;
+  classroomName: string;
+  generateId: () => string;
+}) {
+  const trimmedClassroomName = classroomName.trim();
+  const normalizedClassroomName = normalizeClassroomName(trimmedClassroomName);
+
+  const findMatchingClassroom = async () => {
+    const classrooms = await loadSchoolClassrooms({ supabase, schoolId });
+
+    return classrooms.find(
+      (classroom) =>
+        normalizeClassroomName(classroom.name) === normalizedClassroomName,
+    );
+  };
+
+  const existingClassroom = await findMatchingClassroom();
+  if (existingClassroom?.id) {
+    return existingClassroom.id;
+  }
+
+  const classroomId = generateId();
+  const { error: insertError } = await supabase.from("classrooms").insert({
+    id: classroomId,
+    school_id: schoolId,
+    name: trimmedClassroomName,
+  });
+
+  if (!insertError) {
+    return classroomId;
+  }
+
+  if (!isUniqueViolationError(insertError)) {
+    throw insertError;
+  }
+
+  const concurrentClassroom = await findMatchingClassroom();
+  if (concurrentClassroom?.id) {
+    return concurrentClassroom.id;
+  }
+
+  throw insertError;
+}
+
 async function refreshLectureSessions({
   serviceRoleSupabase,
   lectureId,
@@ -195,10 +282,16 @@ export async function handleTeacherSettingsAction({
     ensureAdmin(actor);
     const name = toRequiredString(formData.get("name"), "name");
     const token = generateToken();
-    const defaultClassroomId = toRequiredString(
-      formData.get("defaultClassroomId"),
-      "defaultClassroomId",
+    const defaultClassroomName = toRequiredString(
+      formData.get("defaultClassroomName"),
+      "defaultClassroomName",
     );
+    const defaultClassroomId = await resolveClassroomId({
+      supabase,
+      schoolId: actor.school_id,
+      classroomName: defaultClassroomName,
+      generateId,
+    });
     const client = {
       id: generateId(),
       school_id: actor.school_id,
